@@ -1,0 +1,122 @@
+{
+  "template": {
+    "name": "FlowJeep Paratransit Fleet Operator Dashboard",
+    "hardware": "ESP32",
+    "connectionType": "GSM",
+    "description": "Operator telemetry and passenger occupancy monitoring for modern paratransit jeepneys."
+  },
+  "datastreams": [
+    {
+      "pin": "V0",
+      "name": "Live GPS Location (Map)",
+      "dataType": "location",
+      "description": "Vehicle real-time coordinate [lat, lon]"
+    },
+    {
+      "pin": "V1",
+      "name": "Current Passenger Count",
+      "dataType": "integer",
+      "min": 0,
+      "max": 32,
+      "unit": "pax"
+    },
+    {
+      "pin": "V2",
+      "name": "Capacity Gauge (%)",
+      "dataType": "double",
+      "min": 0,
+      "max": 100,
+      "unit": "%"
+    },
+    {
+      "pin": "V3",
+      "name": "Vehicle Speed",
+      "dataType": "double",
+      "min": 0,
+      "max": 120,
+      "unit": "km/h"
+    },
+    {
+      "pin": "V4",
+      "name": "Doorway Optical Beam A (Outer)",
+      "dataType": "integer",
+      "min": 0,
+      "max": 1,
+      "description": "E18-D80NK Outer Beam (0=Clear, 1=Blocked)"
+    },
+    {
+      "pin": "V5",
+      "name": "Doorway Optical Beam B (Inner)",
+      "dataType": "integer",
+      "min": 0,
+      "max": 1,
+      "description": "E18-D80NK Inner Beam (0=Clear, 1=Blocked)"
+    },
+    {
+      "pin": "V6",
+      "name": "Total Boarded Today",
+      "dataType": "integer",
+      "min": 0,
+      "max": 2000
+    },
+    {
+      "pin": "V7",
+      "name": "Total Alighted Today",
+      "dataType": "integer",
+      "min": 0,
+      "max": 2000
+    },
+    {
+      "pin": "V8",
+      "name": "Cellular LTE Signal (CSQ)",
+      "dataType": "integer",
+      "min": 0,
+      "max": 31,
+      "unit": "CSQ"
+    },
+    {
+      "pin": "V9",
+      "name": "Vehicle Alternator Voltage",
+      "dataType": "double",
+      "min": 9.0,
+      "max": 16.0,
+      "unit": "V"
+    },
+    {
+      "pin": "V10",
+      "name": "CV Verification Flag",
+      "dataType": "string",
+      "description": "YOLOv8 + ByteTrack audit status: VERIFIED / FLAG"
+    },
+    {
+      "pin": "V11",
+      "name": "OSRM Corridor Snapped Status",
+      "dataType": "string",
+      "description": "Corridor alignment indicator"
+    },
+    {
+      "pin": "V12",
+      "name": "Operator Emergency Alert (SOS)",
+      "dataType": "integer",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "pin": "V13",
+      "name": "Doorway Frame Capture Trigger",
+      "dataType": "integer",
+      "min": 0,
+      "max": 1,
+      "description": "Operator remote capture trigger"
+    }
+  ],
+  "widgets": [
+    { "type": "map", "pin": "V0", "label": "Fleet Real-Time Radar" },
+    { "type": "radial_gauge", "pin": "V2", "label": "Jeepney Capacity %", "color": "#00B14F" },
+    { "type": "value_display", "pin": "V1", "label": "Onboard Passengers" },
+    { "type": "speedometer", "pin": "V3", "label": "Vehicle Velocity" },
+    { "type": "led", "pin": "V4", "label": "Outer Beam A" },
+    { "type": "led", "pin": "V5", "label": "Inner Beam B" },
+    { "type": "super_chart", "pins": ["V1", "V3", "V9"], "label": "Telemetry Timeline" }
+  ]
+}

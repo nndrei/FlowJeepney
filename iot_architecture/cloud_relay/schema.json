@@ -1,0 +1,76 @@
+{
+  "vehicles": {
+    "JEEP-NCR-0482": {
+      "metadata": {
+        "plate_number": "NDB-8421",
+        "route_code": "EDSA-QMC-DILIMAN",
+        "operator": "Diliman Transport Cooperative",
+        "driver_name": "Mang Rodolfo Santos",
+        "max_seats": 24,
+        "model": "Modern Isuzu QKR Euro-4",
+        "status": "IN_SERVICE"
+      },
+      "telemetry": {
+        "lat": 14.65352,
+        "lng": 121.03328,
+        "speed_kph": 24.5,
+        "heading": 85.0,
+        "altitude_m": 42.0,
+        "satellites": 11,
+        "hdop": 0.88,
+        "passengers_onboard": 16,
+        "max_capacity": 24,
+        "capacity_pct": 67,
+        "total_boarded": 142,
+        "total_alighted": 126,
+        "door_state": "CLOSED",
+        "lte_csq": 27,
+        "battery_v": 13.8,
+        "timestamp": 1727788420000,
+        "snapped_corridor": "EDSA-NORTH-CORRIDOR",
+        "next_stop": "TriNoma Jeepney Terminal",
+        "eta_next_stop_seconds": 185
+      },
+      "doorway_events": {
+        "evt_1727788410": {
+          "type": "BOARDING",
+          "delta": 1,
+          "occupancy": 16,
+          "cv_verified": true,
+          "cv_confidence": 0.94,
+          "timestamp": 1727788410000
+        }
+      }
+    }
+  },
+  "corridors": {
+    "EDSA-QMC-DILIMAN": {
+      "name": "North EDSA to UP Diliman via QMC",
+      "active_fleet_count": 8,
+      "avg_headway_min": 4.5,
+      "congestion_level": "MODERATE",
+      "peak_load_pct": 78
+    }
+  },
+  "ml_predictions": {
+    "EDSA-QMC-DILIMAN": {
+      "forecast_horizon_minutes": 60,
+      "predicted_load_pct": 82,
+      "recommended_dispatch_interval_min": 3.5,
+      "weather_condition": "Scattered Rain",
+      "weather_impact_factor": 1.25,
+      "model_version": "RandomForest_v2.1",
+      "last_updated": 1727788400000
+    }
+  },
+  "operator_alerts": {
+    "alert_098": {
+      "vehicle_id": "JEEP-NCR-0482",
+      "severity": "WARNING",
+      "type": "HIGH_OCCUPANCY",
+      "message": "Vehicle at 92% capacity near Quezon Avenue junction.",
+      "timestamp": 1727788350000,
+      "acknowledged": false
+    }
+  }
+}

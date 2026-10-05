@@ -1,0 +1,65 @@
+{
+  "rules": {
+    ".read": "auth != null",
+    "vehicles": {
+      "$vehicle_id": {
+        ".read": true,
+        ".write": "auth != null && (auth.token.role === 'edge_device' || auth.token.role === 'admin' || auth.token.role === 'relay_service')",
+        "telemetry": {
+          ".indexOn": ["timestamp", "route_code", "capacity_pct"],
+          ".validate": "newData.hasChildren(['lat', 'lng', 'speed_kph', 'passengers_onboard', 'capacity_pct', 'timestamp'])",
+          "lat": {
+            ".validate": "newData.isNumber() && newData.val() >= 4.0 && newData.val() <= 22.0"
+          },
+          "lng": {
+            ".validate": "newData.isNumber() && newData.val() >= 116.0 && newData.val() <= 127.0"
+          },
+          "speed_kph": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 160"
+          },
+          "passengers_onboard": {
+            ".validate": "newData.isNumber() && newData.val() >= 0"
+          },
+          "capacity_pct": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 200"
+          },
+          "timestamp": {
+            ".validate": "newData.isNumber()"
+          }
+        },
+        "doorway_events": {
+          ".indexOn": ["timestamp"],
+          "$event_id": {
+            ".validate": "newData.hasChildren(['type', 'delta', 'occupancy', 'timestamp'])",
+            "type": {
+              ".validate": "newData.val() === 'BOARDING' || newData.val() === 'ALIGHTING'"
+            },
+            "delta": {
+              ".validate": "newData.val() === 1 || newData.val() === -1"
+            }
+          }
+        }
+      }
+    },
+    "routes": {
+      ".read": true,
+      "$route_id": {
+        ".write": "auth != null && auth.token.role === 'admin'",
+        "active_vehicles": {
+          ".indexOn": ["eta_minutes", "capacity_pct"]
+        }
+      }
+    },
+    "ml_predictions": {
+      "$route_id": {
+        ".read": true,
+        ".write": "auth != null && (auth.token.role === 'backend_ai' || auth.token.role === 'admin')"
+      }
+    },
+    "operator_alerts": {
+      ".read": "auth != null && (auth.token.role === 'operator' || auth.token.role === 'admin')",
+      ".write": "auth != null",
+      ".indexOn": ["timestamp", "severity", "vehicle_id"]
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "FlowJeep",
+  "description": "Scalable public paratransit tracking system with ESP32-S3 IoT edge node, Firebase Realtime Database cloud relay, Flask YOLOv8n + Random Forest ML backend, and commuter/operator clients.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

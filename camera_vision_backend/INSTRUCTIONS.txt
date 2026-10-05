@@ -1,0 +1,69 @@
+================================================================================
+FLOWJEEP - CAMERA VISION, ESP32 & FIREBASE TELEMETRY PACKAGE
+================================================================================
+
+This package contains everything required to run the real-time passenger
+counting vision system on this computer and stream live passenger counts
+directly into your cloud Firebase Realtime Database.
+
+--------------------------------------------------------------------------------
+DATABASE & CAMERA SETTINGS (ALREADY PRE-CONFIGURED)
+--------------------------------------------------------------------------------
+- Camera Stream URL : http://192.168.0.113:81/stream
+- Firebase Database : https://flowjeep-bf08a-default-rtdb.asia-southeast1.firebasedatabase.app
+- Target Telemetry  : /vehicles/vehicle-01/telemetry.json
+- Vehicle Capacity  : 22 Seats
+
+--------------------------------------------------------------------------------
+HOW TO RUN ON THIS COMPUTER:
+--------------------------------------------------------------------------------
+
+STEP 1: Install Python Requirements
+Open Command Prompt or PowerShell in this folder and run:
+
+    pip install -r requirements.txt
+
+(Or manually: pip install ultralytics opencv-python requests torch pillow)
+
+STEP 2: Make Sure Your ESP32-CAM is Powered On
+Ensure this computer is connected to the same local Wi-Fi ("Snow-WiFi").
+You can verify the camera is streaming by opening this link in your browser:
+    http://192.168.0.113:81/stream
+
+STEP 3: Run the Vision Counter
+In your terminal, run:
+
+    python main.py
+
+A window titled "FlowJeep Camera Vision" will open showing:
+- Real-time video stream from your ESP32-CAM
+- Green bounding boxes around people (Class 0: Person)
+- Live HUD tracking: Entry count, Exit count, and Current Passengers
+
+STEP 4: Live Cloud Sync
+Whenever a person enters or leaves the camera view:
+- The script automatically sends an HTTP PATCH update to Firebase in the cloud.
+- Your FlowJeep website (on PC, phone, or anywhere) updates the jeepney's
+  occupied seats (e.g. 14 / 22) in real time!
+
+--------------------------------------------------------------------------------
+KEYBOARD SHORTCUTS IN THE CAMERA WINDOW:
+--------------------------------------------------------------------------------
+- [Q] : Quit the program
+- [R] : Reset passenger counter to 0 (and resets Firebase to 0)
+- [S] : Save a snapshot photo to the logs folder
+- [+] : Increase missing frame threshold
+- [-] : Decrease missing frame threshold
+
+--------------------------------------------------------------------------------
+FILES INCLUDED:
+--------------------------------------------------------------------------------
+- main.py                      : Main vision engine with automatic Firebase sync
+- config.py                    : Pre-configured camera IP and Firebase URL
+- counter.py                   : Person appearance & disappearance counter
+- tracker.py                   : YOLOv8 + ByteTrack person tracker
+- camera.py                    : High-speed threaded MJPEG stream receiver
+- logger.py                    : CSV event history logger
+- requirements.txt             : Python dependencies list
+- esp32cam_live/esp32cam_live.ino : Source Arduino sketch for the ESP32-CAM
+================================================================================
