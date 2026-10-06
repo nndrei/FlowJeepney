@@ -70,12 +70,17 @@ class CameraStream:
         except Exception:
             pass
         if not self.is_network and isinstance(self.source, int):
-            # width/height can only be requested from local cameras, not network streams
             cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
             cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
         return cap
 
     def start(self) -> bool:
+        if self.use_threading:
+            self._stop_event.clear()
+            self._thread = threading.Thread(target=self._reader_loop, name="camera-reader", daemon=True)
+            self._thread.start()
+            logger.info("Camera stream thread started for source: %s", self.source)
+            return True
         self.cap = self._open()
         if self.cap is None:
             if self.is_network:
@@ -83,14 +88,55 @@ class CameraStream:
                     "Cannot open stream %s. Check: ESP32-CAM powered, same Wi-Fi, correct IP, "
                     "and the page http://<IP>:81/stream opens in a browser.", self.source)
             return False
-        if self.use_threading:
-            self._stop_event.clear()
-            self._thread = threading.Thread(target=self._reader_loop, name="camera-reader", daemon=True)
-            self._thread.start()
         return True
 
     # ---------------------------------------------------------- reader thread
+    def _read_mjpeg_loop(self):
+        import requests
+        import numpy as np
+
+        while not self._stop_event.is_set():
+            try:
+                logger.info("Connecting to MJPEG stream: %s", self.source)
+                with requests.get(self.source, stream=True, timeout=6) as response:
+                    if response.status_code != 200:
+                        logger.warning("Stream returned status %d. Retrying...", response.status_code)
+                        self._stop_event.wait(self.reconnect_delay)
+                        continue
+                    logger.info("Connected to MJPEG stream: %s", self.source)
+                    stream_bytes = b""
+                    for chunk in response.iter_content(chunk_size=4096):
+                        if self._stop_event.is_set():
+                            break
+                        if not chunk:
+                            continue
+                        stream_bytes += chunk
+                        a = stream_bytes.find(b"\xff\xd8")
+                        b = stream_bytes.find(b"\xff\xd9")
+                        if a != -1 and b != -1 and b > a:
+                            jpg = stream_bytes[a : b + 2]
+                            stream_bytes = stream_bytes[b + 2 :]
+                            frame = cv2.imdecode(np.frombuffer(jpg, dtype=np.uint8), cv2.IMREAD_COLOR)
+                            if frame is not None:
+                                with self._cond:
+                                    self._frame = frame
+                                    self._seq += 1
+                                    self._cond.notify_all()
+            except Exception as e:
+                logger.warning("MJPEG stream connection dropped (%s), retrying in %.1fs...", e, self.reconnect_delay)
+                self._stop_event.wait(self.reconnect_delay)
+
     def _reader_loop(self):
+        if self.is_network:
+            # First try cv2.VideoCapture; if it fails to open, switch to resilient direct HTTP MJPEG reader
+            cap = self._open()
+            if cap and cap.isOpened():
+                self.cap = cap
+            else:
+                logger.info("Direct VideoCapture failed for %s. Using HTTP MJPEG stream reader.", self.source)
+                self._read_mjpeg_loop()
+                return
+
         failures = 0
         while not self._stop_event.is_set():
             if self.cap is None or not self.cap.isOpened():

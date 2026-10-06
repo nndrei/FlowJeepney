@@ -23,16 +23,16 @@ export const OperatorLiveTrackingView: React.FC<OperatorLiveTrackingViewProps> =
 
   // Corridor stops for Route 1 (Baclaran to Monumento along Taft / Rizal Ave)
   const stops = [
-    { name: 'Baclaran Terminal', eta: 'Departed', isPast: true, isNext: false },
-    { name: 'EDSA – Taft Station', eta: 'Departed', isPast: true, isNext: false },
-    { name: 'Libertad (Pasay)', eta: 'Departed', isPast: true, isNext: false },
-    { name: 'Taft Ave. / Gil Puyat', eta: '2 min', isPast: false, isNext: true },
-    { name: 'Vito Cruz (DLSU)', eta: '6 min', isPast: false, isNext: false },
-    { name: 'Quirino Ave.', eta: '10 min', isPast: false, isNext: false },
-    { name: 'Pedro Gil (UP Manila)', eta: '14 min', isPast: false, isNext: false },
-    { name: 'United Nations Ave.', eta: '18 min', isPast: false, isNext: false },
-    { name: 'Doroteo Jose / Recto', eta: '26 min', isPast: false, isNext: false },
-    { name: 'Monumento Terminal', eta: '38 min', isPast: false, isNext: false },
+    { name: 'Baclaran Terminal', eta: '--', isPast: false, isNext: false },
+    { name: 'EDSA – Taft Station', eta: '--', isPast: false, isNext: false },
+    { name: 'Libertad (Pasay)', eta: '--', isPast: false, isNext: false },
+    { name: 'Taft Ave. / Gil Puyat', eta: '--', isPast: false, isNext: false },
+    { name: 'Vito Cruz (DLSU)', eta: '--', isPast: false, isNext: false },
+    { name: 'Quirino Ave.', eta: '--', isPast: false, isNext: false },
+    { name: 'Pedro Gil (UP Manila)', eta: '--', isPast: false, isNext: false },
+    { name: 'United Nations Ave.', eta: '--', isPast: false, isNext: false },
+    { name: 'Doroteo Jose / Recto', eta: '--', isPast: false, isNext: false },
+    { name: 'Monumento Terminal', eta: '--', isPast: false, isNext: false },
   ];
 
   // Coordinates along Taft / Rizal corridor
@@ -76,56 +76,6 @@ export const OperatorLiveTrackingView: React.FC<OperatorLiveTrackingViewProps> =
       weight: 3.5,
       dashArray: '5, 8',
       opacity: 0.9,
-    }).addTo(map);
-
-    // Vehicle icon 1 (Active Modern Jeepney)
-    const vehicleIconHtml = `
-      <div style="
-        width: 32px;
-        height: 32px;
-        background: #DC2626;
-        border: 2.5px solid white;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 4px 10px rgba(220, 38, 38, 0.4);
-      ">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
-          <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
-        </svg>
-      </div>
-    `;
-
-    const vehicleMarker = L.marker([14.5505, 120.998], {
-      icon: L.divIcon({
-        className: 'vehicle-marker',
-        html: vehicleIconHtml,
-        iconSize: [32, 32],
-        iconAnchor: [16, 16],
-      }),
-    }).addTo(map);
-
-    // Blue focal point beacon (current GPS fix)
-    const focalIconHtml = `
-      <div style="
-        width: 22px;
-        height: 22px;
-        background: #3B82F6;
-        border: 3px solid white;
-        border-radius: 50%;
-        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.35);
-      "></div>
-    `;
-
-    L.marker([14.5542, 120.9972], {
-      icon: L.divIcon({
-        className: 'focal-marker',
-        html: focalIconHtml,
-        iconSize: [22, 22],
-        iconAnchor: [11, 11],
-      }),
     }).addTo(map);
 
     // Terminal Pin
@@ -233,12 +183,12 @@ export const OperatorLiveTrackingView: React.FC<OperatorLiveTrackingViewProps> =
                   <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">
                     Next Stop
                   </span>
-                  <span className="text-xs font-bold text-slate-900">
-                    Taft Ave. / Gil Puyat
+                  <span className="text-xs font-bold text-slate-700">
+                    Awaiting fleet GPS signal
                   </span>
                 </div>
-                <div className="flex items-center space-x-1 text-xs font-bold text-[#DC2626]">
-                  <span>2 min</span>
+                <div className="flex items-center space-x-1 text-xs font-bold text-slate-400">
+                  <span>--</span>
                   <ChevronRight className="w-4 h-4" />
                 </div>
               </div>
@@ -247,12 +197,12 @@ export const OperatorLiveTrackingView: React.FC<OperatorLiveTrackingViewProps> =
               <div className="pt-3">
                 <div className="flex items-center justify-between text-xs font-semibold mb-1.5">
                   <span className="text-slate-600">Passenger Load</span>
-                  <span className="text-[#DC2626] font-bold">85%</span>
+                  <span className="text-slate-400 font-bold">--</span>
                 </div>
                 <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
                   <div
-                    style={{ width: '85%' }}
-                    className="h-full bg-[#DC2626] rounded-full transition-all duration-500"
+                    style={{ width: '0%' }}
+                    className="h-full bg-slate-300 rounded-full transition-all duration-500"
                   />
                 </div>
               </div>

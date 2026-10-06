@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Menu,
   Radio,
@@ -17,6 +17,7 @@ import {
   ModernJeepneyVehicle,
   filterVehiclesForJourney,
 } from '../../utils/jeepneyCorridors';
+import { submitWaitingPing, cancelWaitingPing } from '../../services/databaseService';
 
 interface WaitingScreenProps {
   pickupCoords: { lat: number; lng: number } | null;
@@ -48,8 +49,60 @@ export const WaitingScreen: React.FC<WaitingScreenProps> = ({
   // Track which vehicles the passenger has signaled/notified
   const [signaledVehicleIds, setSignaledVehicleIds] = useState<Set<string>>(new Set());
   const [lastSignaledPlate, setLastSignaledPlate] = useState<string | null>(null);
+  const activePingIdRef = useRef<string | null>(null);
 
   const effectivePickup = pickupCoords || userCoords;
+
+  // Publish waiting commuter ping to Firebase RTDB while broadcasting on this screen
+  useEffect(() => {
+    if (effectivePickup) {
+      let isMounted = true;
+      let rawUser: string | null = null;
+      try {
+        rawUser = localStorage.getItem('flowjeep_user');
+      } catch {
+        // ignore
+      }
+      const parsedUser = rawUser ? JSON.parse(rawUser) : null;
+
+      submitWaitingPing({
+        userId: parsedUser?.uid || 'guest',
+        isGuest: !parsedUser || !!parsedUser.isGuest,
+        routeId: 'route-1',
+        pickupCoords: {
+          lat: effectivePickup.lat,
+          lng: effectivePickup.lng,
+        },
+        destinationCoords: destinationCoords
+          ? { lat: destinationCoords.lat, lng: destinationCoords.lng }
+          : undefined,
+        pickupStopName: pickupStopName || 'Current Location',
+        destinationName: destinationName || undefined,
+        status: 'waiting',
+      })
+        .then((pingId) => {
+          if (isMounted) {
+            activePingIdRef.current = pingId;
+          }
+        })
+        .catch(() => {});
+
+      return () => {
+        isMounted = false;
+        if (activePingIdRef.current) {
+          cancelWaitingPing(activePingIdRef.current).catch(() => {});
+          activePingIdRef.current = null;
+        }
+      };
+    }
+  }, [
+    effectivePickup?.lat,
+    effectivePickup?.lng,
+    destinationCoords?.lat,
+    destinationCoords?.lng,
+    pickupStopName,
+    destinationName,
+  ]);
 
   // Filter vehicles covering the journey, or fall back to active fleet units from Firebase
   const journeyUnits = effectivePickup
@@ -398,7 +451,7 @@ export const WaitingScreen: React.FC<WaitingScreenProps> = ({
                   <Clock className="w-3.5 h-3.5 text-[#800020]" />
                   <span>Next Terminal Dispatch</span>
                 </span>
-                <span className="font-black text-[#800020]">~6–8 minutes</span>
+                <span className="font-semibold text-slate-500">Awaiting live dispatch</span>
               </div>
             </div>
           )}

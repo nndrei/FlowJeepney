@@ -1,12 +1,17 @@
-export type UserRole = 'commuter' | 'operator';
+export type UserRole = 'commuter' | 'driver' | 'admin' | 'operator';
 
 export interface AuthUser {
   uid: string;
   name: string;
   email: string;
   role: UserRole;
-  operatorId?: string;
+  isGuest?: boolean;
+  driverId?: string;
+  operatorId?: string; // backwards compatibility alias
+  assignedJeepneyId?: string;
   assignedRouteId?: string;
   assignedPlate?: string;
   cooperative?: string;
+  licenseNumber?: string;
+  phone?: string;
 }

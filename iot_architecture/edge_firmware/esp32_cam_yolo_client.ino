@@ -17,12 +17,12 @@
 #include <HTTPClient.h>
 
 // ===================== 1. USER CONFIGURATION =====================
-const char* ssid     = "Snow-WiFi_5GHz";
-const char* password = "YOUR_WIFI_PASSWORD"; // <-- Replace with your Wi-Fi password
+const char* ssid     = "Converse_5GHz_x5M9";
+const char* password = "TQgXz95Z"; // <-- Replace with your Wi-Fi password
 
 // IP address of the PC running the Python YOLOv8 server
 // (Your PC's IP on Snow-WiFi_5GHz is 192.168.1.63)
-const char* serverUrl = "http://192.168.1.63:5000/upload-frame";
+const char* serverUrl = "http://192.168.100.173:81/stream";
 
 // Frame capture interval (in milliseconds)
 const unsigned long CAPTURE_INTERVAL_MS = 3000; // Captures and checks every 3 seconds

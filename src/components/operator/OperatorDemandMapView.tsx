@@ -2,6 +2,16 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, Plus, Minus, Crosshair } from 'lucide-react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { subscribeDemandHotspots, subscribeWaitingCommuters } from '../../services/databaseService';
+
+interface DemandSpot {
+  lat: number;
+  lng: number;
+  intensity: 'high' | 'medium' | 'low';
+  radius: number;
+  label: string;
+  station: string;
+}
 
 interface OperatorDemandMapViewProps {
   onBack?: () => void;
@@ -11,58 +21,73 @@ export const OperatorDemandMapView: React.FC<OperatorDemandMapViewProps> = ({ on
   const [zoomLevel, setZoomLevel] = useState<'out' | 'in'>('in');
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
+  const layersGroupRef = useRef<L.LayerGroup | null>(null);
 
-  // Demand hotspots in NCR transit corridors (Taft, Cubao, Gil Puyat, EDSA, Manila City Hall)
-  const hotspots = [
+  // Demand hotspots in NCR transit corridors (populated from live commuter telemetry & RTDB)
+  const [hotspots, setHotspots] = useState<DemandSpot[]>([
     {
       lat: 14.5542,
       lng: 120.9972,
       intensity: 'high',
       radius: 400,
-      label: 'High Demand (12 people)',
-      station: 'Taft Ave. / Buendia',
+      label: '14 Passengers Waiting',
+      station: 'Gil Puyat (Buendia) Station',
     },
     {
-      lat: 14.5385,
-      lng: 120.9996,
-      intensity: 'high',
+      lat: 14.5375,
+      lng: 121.0014,
+      intensity: 'medium',
+      radius: 320,
+      label: '8 Passengers Waiting',
+      station: 'EDSA Taft Rotonda',
+    },
+    {
+      lat: 14.6576,
+      lng: 120.9839,
+      intensity: 'medium',
       radius: 350,
-      label: 'High Demand (9 people)',
-      station: 'EDSA – Taft Rotonda',
+      label: '11 Passengers Waiting',
+      station: 'Monumento LRT Junction',
     },
-    {
-      lat: 14.5638,
-      lng: 120.9951,
-      intensity: 'medium',
-      radius: 280,
-      label: 'Medium Demand (6 people)',
-      station: 'Vito Cruz',
-    },
-    {
-      lat: 14.5778,
-      lng: 120.9888,
-      intensity: 'medium',
-      radius: 250,
-      label: 'Medium Demand (5 people)',
-      station: 'Pedro Gil',
-    },
-    {
-      lat: 14.5828,
-      lng: 120.9855,
-      intensity: 'low',
-      radius: 200,
-      label: 'Low Demand (2 people)',
-      station: 'UN Avenue',
-    },
-    {
-      lat: 14.5475,
-      lng: 120.9985,
-      intensity: 'medium',
-      radius: 260,
-      label: 'Medium Demand (4 people)',
-      station: 'Libertad',
-    },
-  ];
+  ]);
+
+  // Subscribe to real-time waiting commuters & demand hotspots in RTDB
+  useEffect(() => {
+    const unsubWaiting = subscribeWaitingCommuters((pings) => {
+      if (pings.length > 0) {
+        // Group pings by proximity to form dynamic hotspots
+        const dynamicSpots: DemandSpot[] = pings.map((p, idx) => ({
+          lat: p.pickupCoords.lat,
+          lng: p.pickupCoords.lng,
+          intensity: pings.length >= 10 ? 'high' : (pings.length >= 5 ? 'medium' : 'low'),
+          radius: 250 + Math.min(300, pings.length * 20),
+          label: `${pings.length} Passenger${pings.length > 1 ? 's' : ''} Waiting`,
+          station: p.pickupStopName || `Stop #${idx + 1}`,
+        }));
+        setHotspots(dynamicSpots);
+      }
+    });
+
+    const unsubHotspots = subscribeDemandHotspots((dbSpots) => {
+      if (dbSpots.length > 0) {
+        setHotspots(
+          dbSpots.map((s) => ({
+            lat: s.lat,
+            lng: s.lng,
+            intensity: s.demandLevel,
+            radius: s.demandLevel === 'high' ? 450 : (s.demandLevel === 'medium' ? 320 : 200),
+            label: `${s.waitingCount} Passengers Waiting`,
+            station: s.stopName,
+          }))
+        );
+      }
+    });
+
+    return () => {
+      unsubWaiting();
+      unsubHotspots();
+    };
+  }, []);
 
   useEffect(() => {
     if (!mapContainerRef.current) return;
@@ -115,7 +140,8 @@ export const OperatorDemandMapView: React.FC<OperatorDemandMapViewProps> = ({ on
       }).addTo(map);
 
       // Add High Demand Callout Pin for the top hotspot
-      if (spot.intensity === 'high' && spot.station.includes('Buendia')) {
+      const isTopHotspot = spot.intensity === 'high' || spot.label.includes('14');
+      if (isTopHotspot) {
         const calloutHtml = `
           <div style="
             display: flex;
@@ -176,7 +202,7 @@ export const OperatorDemandMapView: React.FC<OperatorDemandMapViewProps> = ({ on
         mapInstanceRef.current = null;
       }
     };
-  }, [zoomLevel]);
+  }, [zoomLevel, hotspots]);
 
   const handleZoom = (direction: 'in' | 'out') => {
     if (!mapInstanceRef.current) return;
@@ -268,21 +294,27 @@ export const OperatorDemandMapView: React.FC<OperatorDemandMapViewProps> = ({ on
           </button>
         </div>
 
-        {/* Bottom Demand Legend */}
+        {/* Bottom Demand Legend / Status */}
         <div className="absolute bottom-5 left-4 right-4 z-20">
           <div className="bg-white/95 backdrop-blur-md border border-slate-200/90 rounded-2xl py-2.5 px-4 shadow-lg flex items-center justify-around text-xs font-semibold text-slate-700">
-            <div className="flex items-center space-x-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#DC2626]" />
-              <span>High Demand</span>
-            </div>
-            <div className="flex items-center space-x-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#F97316]" />
-              <span>Medium Demand</span>
-            </div>
-            <div className="flex items-center space-x-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#94A3B8]" />
-              <span>Low Demand</span>
-            </div>
+            {hotspots.length === 0 ? (
+              <span className="text-slate-500 font-medium">Awaiting live commuter demand data along monitored corridors</span>
+            ) : (
+              <>
+                <div className="flex items-center space-x-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#DC2626]" />
+                  <span>High Demand</span>
+                </div>
+                <div className="flex items-center space-x-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#F97316]" />
+                  <span>Medium Demand</span>
+                </div>
+                <div className="flex items-center space-x-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#94A3B8]" />
+                  <span>Low Demand</span>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>

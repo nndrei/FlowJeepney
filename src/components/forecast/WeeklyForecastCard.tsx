@@ -7,13 +7,13 @@ export interface WeeklyForecastCardProps {
 }
 
 const DAY_PROFILES = [
-  { day: 'Mon', pct: 95, label: '95%' },
-  { day: 'Tue', pct: 88, label: '88%' },
-  { day: 'Wed', pct: 82, label: '82%' },
-  { day: 'Thu', pct: 86, label: '86%' },
-  { day: 'Fri', pct: 98, label: '98%' },
-  { day: 'Sat', pct: 64, label: '64%' },
-  { day: 'Sun', pct: 48, label: '48%' },
+  { day: 'Mon', pct: 0, label: '--' },
+  { day: 'Tue', pct: 0, label: '--' },
+  { day: 'Wed', pct: 0, label: '--' },
+  { day: 'Thu', pct: 0, label: '--' },
+  { day: 'Fri', pct: 0, label: '--' },
+  { day: 'Sat', pct: 0, label: '--' },
+  { day: 'Sun', pct: 0, label: '--' },
 ];
 
 export const WeeklyForecastCard: React.FC<WeeklyForecastCardProps> = ({
@@ -38,7 +38,7 @@ export const WeeklyForecastCard: React.FC<WeeklyForecastCardProps> = ({
       {/* Info Callout Banner */}
       <div className="mb-5 p-3 bg-slate-50/90 rounded-2xl border border-slate-100 flex items-start space-x-2.5 text-[12px] text-slate-500 leading-relaxed">
         <Info className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-        <span>Corridor predictive models show anticipated rush surges vs open midday runs.</span>
+        <span>Awaiting historical telemetry and fleet dispatch data to generate predictive occupancy trends.</span>
       </div>
 
       {/* 7-Day Columns with Proportional Load Bars */}

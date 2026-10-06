@@ -10,19 +10,22 @@ import { MainInterface } from './components/MainInterface';
 import { OperatorBlankScreen } from './components/operator/OperatorBlankScreen';
 import { AuthUser } from './types/auth';
 import { logoutUser } from './services/authService';
-import { seedTestUsers } from './services/seedUsers';
-
+import { initializeDatabaseDefaults } from './services/databaseService';
 type AppScreen = 'onboarding' | 'auth' | 'main';
 
 export default function App() {
+  useEffect(() => {
+    // Non-destructive initial database configuration
+    initializeDatabaseDefaults();
+  }, []);
+
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('flowjeep_user');
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
-          // Never default to operator automatically on app load
-          if (parsed && parsed.role === 'commuter') {
+          if (parsed && (parsed.role === 'commuter' || parsed.isGuest || parsed.role === 'driver' || parsed.role === 'admin')) {
             return parsed;
           }
         } catch {
@@ -33,18 +36,25 @@ export default function App() {
     return null;
   });
 
-  // Default to onboarding; finishing onboarding always leads directly to Auth screen
-  const [currentScreen, setCurrentScreen] = useState<AppScreen>('onboarding');
-
-  // Initialize and seed Firebase Realtime Database test accounts on mount
-  useEffect(() => {
-    seedTestUsers().catch((err) => {
-      console.warn('[App] Test users initialization notice:', err);
-    });
-  }, []);
+  // Preserve session if already stored in localStorage; otherwise start on onboarding
+  const [currentScreen, setCurrentScreen] = useState<AppScreen>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('flowjeep_user');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (parsed && (parsed.role === 'commuter' || parsed.isGuest || parsed.role === 'driver' || parsed.role === 'admin')) {
+            return 'main';
+          }
+        } catch {
+          // ignore
+        }
+      }
+    }
+    return 'onboarding';
+  });
 
   const handleOnboardingComplete = () => {
-    // Never jump to operator by default; always present the login screen
     setCurrentScreen('auth');
   };
 
@@ -84,7 +94,7 @@ export default function App() {
         )}
 
         {currentScreen === 'main' && (
-          currentUser?.role === 'operator' ? (
+          (currentUser?.role === 'admin' || currentUser?.role === 'driver' || currentUser?.role === 'operator') ? (
             <OperatorBlankScreen user={currentUser} onLogout={handleLogout} />
           ) : (
             <MainInterface user={currentUser} onLogout={handleLogout} />

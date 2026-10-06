@@ -17,13 +17,13 @@ import {
   Users,
   Clock,
   TrendingUp,
+  Navigation,
 } from 'lucide-react';
 import L from 'leaflet';
 import { NavigationDrawer } from './NavigationDrawer';
 import { ForecastScreen } from './forecast/ForecastScreen';
 import { WaitingScreen } from './waiting/WaitingScreen';
-import { ref, onValue } from 'firebase/database';
-import { rtdb } from '../services/firebase';
+import { subscribeLiveTelemetry } from '../services/databaseService';
 import {
   filterVehiclesForJourney,
   projectToNearestCorridor,
@@ -339,7 +339,7 @@ interface MainInterfaceProps {
   onOpenMenu?: () => void;
   onNavigateTab?: (tab: 'home' | 'waiting' | 'forecast' | 'profile') => void;
   onLogout?: () => void;
-  user?: { name: string; email: string } | null;
+  user?: { name: string; email: string; isGuest?: boolean } | null;
 }
 
 export const MainInterface: React.FC<MainInterfaceProps> = ({
@@ -1055,55 +1055,33 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({
   useEffect(() => {
     let unsubscribe: (() => void) | null = null;
     try {
-      const vehiclesRef = ref(rtdb, 'vehicles');
-      unsubscribe = onValue(vehiclesRef, (snapshot) => {
-        if (snapshot.exists()) {
-          const data = snapshot.val();
-          const parsedList: ModernJeepneyVehicle[] = [];
-          Object.keys(data).forEach((key) => {
-            const item = data[key];
-            const tel = item.telemetry || item;
-            if (tel) {
-              const coord = tel.currentCoord || [
-                Number(tel.latitude || tel.lat) || 14.6544,
-                Number(tel.longitude || tel.lng) || 120.9839,
-              ];
-              parsedList.push({
-                id: key,
-                routeId: tel.routeId || 'route-1',
-                routeCode: tel.routeCode || 'Route 1',
-                routeName: tel.routeName || 'Baclaran – Monumento',
-                plateNumber: tel.plateNumber || 'NDL-8421',
-                model: tel.model || 'Modern Jeepney',
-                isAircon: tel.isAircon ?? true,
-                totalSeats: Number(tel.totalSeats) || 22,
-                occupiedSeats: Number(tel.occupiedSeats) || 0,
-                standingAllowed: true,
-                speedKmh: Number(tel.speedKmh) || 20,
-                currentCoord: coord,
-                headingDegrees: Number(tel.headingDegrees) || 0,
-              });
-            }
-          });
-          if (parsedList.length > 0) {
-            setLiveVehicles(parsedList);
-          }
-        }
+      unsubscribe = subscribeLiveTelemetry((records) => {
+        const parsedList: ModernJeepneyVehicle[] = records.map((tel) => {
+          const coord: [number, number] = tel.currentCoord || [14.6544, 120.9839];
+          return {
+            id: tel.jeepneyId,
+            routeId: tel.routeId || 'route-1',
+            routeCode: tel.routeCode || 'Route 1',
+            routeName: tel.routeName || 'Baclaran – Monumento',
+            plateNumber: tel.plateNumber || 'NDL-8421',
+            model: 'Modern Jeepney',
+            isAircon: true,
+            totalSeats: Number(tel.totalSeats) || 22,
+            occupiedSeats: Number(tel.occupiedSeats) || 0,
+            standingAllowed: true,
+            speedKmh: Number(tel.speedKmh) || 20,
+            currentCoord: coord,
+            headingDegrees: Number(tel.headingDegrees) || 0,
+          };
+        });
+        setLiveVehicles(parsedList);
       });
     } catch (err) {
-      console.warn('[Firebase RTDB] Vehicle subscription notice:', err);
+      console.warn('[Firebase RTDB] Live telemetry subscription notice:', err);
     }
 
-    const handleTelemetryEvent = (e: any) => {
-      const payload = e.detail || e.data;
-      if (Array.isArray(payload)) {
-        setLiveVehicles(payload);
-      }
-    };
-    window.addEventListener('flowjeep:telemetry', handleTelemetryEvent);
     return () => {
       if (unsubscribe) unsubscribe();
-      window.removeEventListener('flowjeep:telemetry', handleTelemetryEvent);
     };
   }, []);
 
@@ -2010,6 +1988,19 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({
             </div>
           )}
 
+          {/* Empty State when no jeepneys active */}
+          {!isSheetMinimized && displayVehicles.length === 0 && (
+            <div className="mt-2.5 p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl flex items-center space-x-3 text-slate-500">
+              <div className="w-8 h-8 rounded-xl bg-slate-200/70 flex items-center justify-center shrink-0 text-slate-400">
+                <Navigation className="w-4 h-4" />
+              </div>
+              <div className="text-left">
+                <p className="text-[12.5px] font-bold text-slate-700">No jeepneys currently active</p>
+                <p className="text-[11px] text-slate-400">Waiting for live fleet vehicles to broadcast GPS along this corridor</p>
+              </div>
+            </div>
+          )}
+
           {/* Quick-Action: "I Am Waiting" Trigger Button */}
           {!isSheetMinimized && (
             <button
@@ -2119,13 +2110,13 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
           <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-2xs text-center">
             <div className="w-16 h-16 rounded-full bg-slate-800 text-white flex items-center justify-center mx-auto text-xl font-bold shadow-md">
-              {user?.name ? user.name[0].toUpperCase() : 'C'}
+              {user?.name ? user.name[0].toUpperCase() : (user?.isGuest ? 'G' : 'C')}
             </div>
             <h3 className="text-[16px] font-bold text-slate-900 mt-2.5">
-              {user?.name || 'Commuter'}
+              {user?.name || (user?.isGuest ? 'Guest Passenger' : 'Commuter')}
             </h3>
             <p className="text-[12px] text-slate-400">
-              {user?.email || 'commuter@flowjeep.ph'}
+              {user?.email || (user?.isGuest ? 'Guest Session' : 'No email linked')}
             </p>
             <div className="mt-4 pt-3 border-t border-slate-100 grid grid-cols-2 gap-2 text-left">
               <div className="bg-slate-900/[0.025] p-2.5 rounded-xl border border-slate-900/[0.06] shadow-2xs">
@@ -2133,7 +2124,7 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({
                   Account Status
                 </span>
                 <span className="text-[12px] font-semibold text-[#007A37]">
-                  Active Passenger
+                  {user?.isGuest ? 'Guest Access' : 'Active Passenger'}
                 </span>
               </div>
               <div className="bg-slate-900/[0.025] p-2.5 rounded-xl border border-slate-900/[0.06] shadow-2xs">

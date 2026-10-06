@@ -14,21 +14,21 @@ export const OperatorPassengerLoadView: React.FC<OperatorPassengerLoadViewProps>
 }) => {
   const [showDetails, setShowDetails] = useState(false);
 
-  // Hourly load data matching design bar chart (6 AM, 9 AM, 12 PM, 3 PM, 6 PM, 9 PM)
+  // Hourly load data (populated from live vehicle passenger count sensors)
   const hourlyData = [
-    { time: '6 AM', pct: 40, isCurrent: false },
-    { time: '9 AM', pct: 65, isCurrent: false },
-    { time: '12 PM', pct: 75, isCurrent: false },
-    { time: '3 PM', pct: 90, isCurrent: false },
-    { time: '6 PM', pct: 98, isCurrent: true },
-    { time: '9 PM', pct: 35, isCurrent: false },
+    { time: '6 AM', pct: 0, isCurrent: false },
+    { time: '9 AM', pct: 0, isCurrent: false },
+    { time: '12 PM', pct: 0, isCurrent: false },
+    { time: '3 PM', pct: 0, isCurrent: false },
+    { time: '6 PM', pct: 0, isCurrent: false },
+    { time: '9 PM', pct: 0, isCurrent: false },
   ];
 
   // Radial Gauge Math
   const radius = 64;
   const circumference = 2 * Math.PI * radius;
-  const loadPercentage = 85;
-  const strokeDashoffset = circumference - (loadPercentage / 100) * circumference;
+  const loadPercentage = 0;
+  const strokeDashoffset = circumference;
 
   return (
     <div className="w-full flex-1 flex flex-col overflow-y-auto no-scrollbar bg-white select-none">
@@ -84,10 +84,10 @@ export const OperatorPassengerLoadView: React.FC<OperatorPassengerLoadViewProps>
 
             {/* Centered Gauge Text */}
             <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-              <span className="text-3xl font-extrabold text-slate-900 tracking-tight">
-                {loadPercentage}%
+              <span className="text-3xl font-extrabold text-slate-400 tracking-tight">
+                --
               </span>
-              <span className="text-xs font-medium text-slate-500 mt-0.5">
+              <span className="text-xs font-medium text-slate-400 mt-0.5">
                 Load Capacity
               </span>
             </div>
@@ -98,7 +98,7 @@ export const OperatorPassengerLoadView: React.FC<OperatorPassengerLoadViewProps>
               Current Passengers
             </span>
             <span className="text-lg font-bold text-slate-800">
-              34 <span className="text-slate-400 font-normal">/ 40</span>
+              -- <span className="text-slate-400 font-normal">/ --</span>
             </span>
           </div>
         </div>
@@ -107,7 +107,7 @@ export const OperatorPassengerLoadView: React.FC<OperatorPassengerLoadViewProps>
         <div className="w-full max-w-sm mt-6 pt-4 border-t border-slate-100">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xs font-bold text-slate-900">Load Trend</h2>
-            <span className="text-[10px] text-slate-400 font-medium">Today's Hourly Peak</span>
+            <span className="text-[10px] text-slate-400 font-medium">Awaiting Live Sensor Data</span>
           </div>
 
           <div className="h-32 w-full flex items-end justify-between px-2 pt-2">
@@ -116,11 +116,7 @@ export const OperatorPassengerLoadView: React.FC<OperatorPassengerLoadViewProps>
                 <div className="w-full flex justify-center items-end h-24">
                   <div
                     style={{ height: `${item.pct}%` }}
-                    className={`w-3.5 rounded-t-md transition-all duration-500 ${
-                      item.isCurrent
-                        ? 'bg-[#DC2626] shadow-2xs'
-                        : 'bg-red-400/80 hover:bg-[#DC2626]'
-                    }`}
+                    className="w-3.5 rounded-t-md transition-all duration-500 bg-slate-200"
                   />
                 </div>
                 <span className="text-[10px] text-slate-400 font-medium">
@@ -136,15 +132,15 @@ export const OperatorPassengerLoadView: React.FC<OperatorPassengerLoadViewProps>
           <div className="w-full mt-4 bg-slate-50 border border-slate-200 rounded-2xl p-3.5 text-left text-xs space-y-2 animate-in fade-in duration-200">
             <div className="flex items-center justify-between font-semibold text-slate-700">
               <span>Seated Occupancy</span>
-              <span className="text-emerald-600 font-bold">28 / 28 (100%)</span>
+              <span className="text-slate-500 font-bold">-- / --</span>
             </div>
             <div className="flex items-center justify-between font-semibold text-slate-700">
               <span>Standing Capacity</span>
-              <span className="text-amber-600 font-bold">6 / 12 (50%)</span>
+              <span className="text-slate-500 font-bold">-- / --</span>
             </div>
             <div className="flex items-center justify-between font-semibold text-slate-700">
               <span>Total Alighted Today</span>
-              <span className="text-slate-800 font-bold">142 passengers</span>
+              <span className="text-slate-500 font-bold">--</span>
             </div>
           </div>
         )}

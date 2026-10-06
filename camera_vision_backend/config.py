@@ -6,7 +6,7 @@ from pathlib import Path
 # VIDEO SOURCE - pick ONE
 # ---------------------------------------------------------------------------
 # 1) ESP32-CAM-MB over Wi-Fi (run the esp32cam_live sketch, read the IP from Serial Monitor)
-ESP32_CAM_IP = "192.168.0.113"          # <-- Put your ESP32-CAM's IP here
+ESP32_CAM_IP = "192.168.100.173"          # <-- ESP32-CAM live stream IP
 CAMERA_SOURCE = f"http://{ESP32_CAM_IP}:81/stream"
 
 # 2) Laptop webcam (change to 0 to test immediately on your PC webcam!):
@@ -58,7 +58,15 @@ MAX_JEEPNEY_CAPACITY = 22
 # FIREBASE REALTIME DATABASE SYNC
 # ---------------------------------------------------------------------------
 ENABLE_FIREBASE_SYNC = True
-FIREBASE_DATABASE_URL = "https://flowjeep-bf08a-default-rtdb.asia-southeast1.firebasedatabase.app/vehicles/vehicle-01/telemetry.json"
+FIREBASE_RTDB_BASE_URL = "https://flowjeep-bf08a-default-rtdb.asia-southeast1.firebasedatabase.app"
+JEEPNEY_ID = "JEEP-NCR-0482"
+ROUTE_ID = "route-1"
+ROUTE_NAME = "Baclaran – Monumento via EDSA"
+PLATE_NUMBER = "NDL-8421"
+FIREBASE_TELEMETRY_URL = f"{FIREBASE_RTDB_BASE_URL}/live_telemetry/{JEEPNEY_ID}.json"
+FIREBASE_EVENTS_URL = f"{FIREBASE_RTDB_BASE_URL}/doorway_events.json"
+DEVICE_ID = "DEV-ESP32-01"
+FIREBASE_DEVICE_URL = f"{FIREBASE_RTDB_BASE_URL}/devices/{DEVICE_ID}.json"
 
 BASE_DIR = Path(__file__).resolve().parent
 LOGS_DIR = BASE_DIR / "logs"

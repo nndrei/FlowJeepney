@@ -8,7 +8,7 @@ interface OperatorBlankScreenProps {
 
 export const OperatorBlankScreen: React.FC<OperatorBlankScreenProps> = ({ onLogout }) => {
   return (
-    <div className="w-full h-full min-h-screen bg-white relative">
+    <div className="w-full h-full bg-white relative flex flex-col items-center justify-center select-none">
       {/* Discreet logout button in top-right for session reset during testing */}
       <button
         type="button"

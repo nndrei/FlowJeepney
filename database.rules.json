@@ -1,0 +1,64 @@
+{
+  "rules": {
+    "system_config": {
+      ".read": true,
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin'"
+    },
+    "users": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() === 'admin')",
+        ".write": "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() === 'admin')"
+      }
+    },
+    "routes": {
+      ".read": true,
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin'"
+    },
+    "jeepneys": {
+      ".read": true,
+      "$jeepney_id": {
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'driver' || root.child('users').child(auth.uid).child('role').val() === 'operator' || root.child('users').child(auth.uid).child('role').val() === 'admin')"
+      }
+    },
+    "devices": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "live_telemetry": {
+      ".read": true,
+      ".indexOn": ["routeId", "capacityPct", "lastUpdate", "isOnline"],
+      "$jeepney_id": {
+        ".write": true
+      }
+    },
+    "trips": {
+      ".read": true,
+      ".indexOn": ["jeepneyId", "routeId", "startTime", "status"],
+      "$trip_id": {
+        ".write": "auth != null"
+      }
+    },
+    "doorway_events": {
+      ".read": "auth != null",
+      ".indexOn": ["tripId", "jeepneyId", "timestamp"],
+      "$event_id": {
+        ".write": true
+      }
+    },
+    "waiting_commuters": {
+      ".read": true,
+      ".indexOn": ["routeId", "status", "expiresAt"],
+      "$ping_id": {
+        ".write": true
+      }
+    },
+    "demand_hotspots": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+    "forecast_records": {
+      ".read": true,
+      ".write": "auth != null"
+    }
+  }
+}

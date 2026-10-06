@@ -45,7 +45,15 @@ from config import (
     COLOR_ENTRY,
     COLOR_EXIT,
     ENABLE_FIREBASE_SYNC,
-    FIREBASE_DATABASE_URL,
+    FIREBASE_TELEMETRY_URL,
+    FIREBASE_EVENTS_URL,
+    FIREBASE_DEVICE_URL,
+    DEVICE_ID,
+    ESP32_CAM_IP,
+    JEEPNEY_ID,
+    ROUTE_ID,
+    ROUTE_NAME,
+    PLATE_NUMBER,
     MAX_JEEPNEY_CAPACITY,
 )
 from camera import CameraStream
@@ -189,6 +197,50 @@ def main():
     prev_time = time.time()
     fps = 0.0
     status = "RUNNING"
+    last_heartbeat = time.time()
+
+    def sync_firebase(count: int, is_heartbeat: bool = False):
+        if not ENABLE_FIREBASE_SYNC:
+            return
+        now_ms = int(time.time() * 1000)
+        capacity_pct = round((count / MAX_JEEPNEY_CAPACITY) * 100)
+        load_cat = "Seats Available" if capacity_pct < 80 else ("Near-Full" if capacity_pct < 95 else "Full / Standing")
+        telemetry_payload = {
+            "jeepneyId": JEEPNEY_ID,
+            "routeId": ROUTE_ID,
+            "routeCode": "Route 1",
+            "routeName": ROUTE_NAME,
+            "plateNumber": PLATE_NUMBER,
+            "currentCoord": [14.6544, 120.9839],
+            "headingDegrees": 88.0,
+            "speedKmh": 24.0,
+            "occupiedSeats": count,
+            "totalSeats": MAX_JEEPNEY_CAPACITY,
+            "capacityPct": capacity_pct,
+            "loadCategory": load_cat,
+            "lastUpdate": now_ms,
+            "isOnline": True,
+        }
+        device_payload = {
+            "deviceId": DEVICE_ID,
+            "jeepneyId": JEEPNEY_ID,
+            "plateNumber": PLATE_NUMBER,
+            "esp32CamIp": ESP32_CAM_IP,
+            "cameraStatus": "STREAMING",
+            "dualBeamStatus": "CONNECTED",
+            "lastHeartbeat": now_ms,
+        }
+        try:
+            requests.patch(FIREBASE_TELEMETRY_URL, json=telemetry_payload, timeout=2.0)
+            requests.patch(FIREBASE_DEVICE_URL, json=device_payload, timeout=2.0)
+            if not is_heartbeat:
+                logger.info(f"[Firebase Sync] Live passenger count pushed -> {count} / {MAX_JEEPNEY_CAPACITY} ({load_cat})")
+        except Exception as e:
+            logger.debug(f"[Firebase Sync Notice] {e}")
+
+    # Immediately push active heartbeat to Firebase upon camera launch
+    sync_firebase(0, is_heartbeat=True)
+    logger.info(f"[Firebase Initialized] ESP32-CAM active: {ESP32_CAM_IP} -> Unit {JEEPNEY_ID}")
 
     try:
         while True:
@@ -197,7 +249,16 @@ def main():
                 if camera.is_live:
                     # ESP32-CAM / webcam hiccup: keep the window alive while it reconnects
                     status = "WAITING FOR CAMERA"
-                    if cv2.waitKey(1) & 0xFF == ord("q"):
+                    placeholder = np.zeros((FRAME_HEIGHT, FRAME_WIDTH, 3), dtype=np.uint8)
+                    cv2.putText(placeholder, "CONNECTING TO ESP32-CAM...", (60, FRAME_HEIGHT // 2 - 10),
+                                cv2.FONT_HERSHEY_DUPLEX, 0.65, (0, 215, 255), 1, cv2.LINE_AA)
+                    cv2.putText(placeholder, f"Source: {CAMERA_SOURCE}", (60, FRAME_HEIGHT // 2 + 25),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.44, (180, 180, 180), 1, cv2.LINE_AA)
+                    cv2.putText(placeholder, "Make sure ESP32-CAM is powered and on 'Snow-WiFi'", (60, FRAME_HEIGHT // 2 + 55),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.40, (120, 120, 120), 1, cv2.LINE_AA)
+                    placeholder = draw_hud_overlay(placeholder, counter, fps, status, recent_toast, toast_timer)
+                    cv2.imshow(window_name, placeholder)
+                    if cv2.waitKey(100) & 0xFF == ord("q"):
                         break
                     continue
                 logger.warning("End of video / camera read failed, stopping.")
@@ -215,21 +276,32 @@ def main():
             if events and ENABLE_FIREBASE_SYNC:
                 stats = counter.get_stats()
                 new_count = stats["current_passenger_count"]
-                try:
-                    payload = {
-                        "occupiedSeats": new_count,
-                        "totalSeats": MAX_JEEPNEY_CAPACITY,
-                        "routeCode": "Route 1",
-                        "routeName": "Baclaran – Monumento",
-                        "plateNumber": "NDL-8421",
-                        "speedKmh": 24.0,
-                        "currentCoord": [14.6544, 120.9839],
-                        "lastVisionUpdate": int(time.time() * 1000)
-                    }
-                    requests.patch(FIREBASE_DATABASE_URL, json=payload, timeout=1.5)
-                    logger.info(f"[Firebase Sync] Live passenger count pushed -> {new_count} / {MAX_JEEPNEY_CAPACITY}")
-                except Exception as e:
-                    logger.warning(f"[Firebase Sync Error] {e}")
+                now_ms = int(time.time() * 1000)
+
+                # 1. Log doorway event to RTDB /doorway_events
+                for evt in events:
+                    try:
+                        event_payload = {
+                            "jeepneyId": JEEPNEY_ID,
+                            "eventType": evt.get("event_type", "BOARDING"),
+                            "trackingId": evt.get("tracking_id", -1),
+                            "confidence": float(f"{evt.get('confidence', 0.0):.2f}"),
+                            "currentOccupancy": new_count,
+                            "timestamp": now_ms,
+                            "location": [14.6544, 120.9839]
+                        }
+                        requests.post(FIREBASE_EVENTS_URL, json=event_payload, timeout=1.2)
+                    except Exception as evt_err:
+                        logger.debug(f"[Firebase Event Log Error] {evt_err}")
+
+                # 2. Push updated passenger count
+                sync_firebase(new_count, is_heartbeat=False)
+                last_heartbeat = time.time()
+            elif time.time() - last_heartbeat >= 5.0:
+                # Periodic 5-second online heartbeat
+                stats = counter.get_stats()
+                sync_firebase(stats["current_passenger_count"], is_heartbeat=True)
+                last_heartbeat = time.time()
 
             now = time.time()
             dt = now - prev_time

@@ -4,11 +4,11 @@ import 'leaflet/dist/leaflet.css';
 import { Plus, Minus, Crosshair } from 'lucide-react';
 
 interface LocationMapPreviewProps {
-  coords: { lat: number; lng: number };
+  coords?: { lat: number; lng: number } | null;
   name: string;
 }
 
-export const LocationMapPreview: React.FC<LocationMapPreviewProps> = ({ coords, name }) => {
+const LocationMapPreviewComponent: React.FC<LocationMapPreviewProps> = ({ coords, name }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markerRef = useRef<L.Marker | null>(null);
@@ -16,7 +16,7 @@ export const LocationMapPreview: React.FC<LocationMapPreviewProps> = ({ coords, 
 
   // Initialize interactive Leaflet map
   useEffect(() => {
-    if (!containerRef.current) return;
+    if (!containerRef.current || !coords) return;
 
     // Safety cleanup in case of hot-reload
     if (mapRef.current) {
@@ -98,10 +98,10 @@ export const LocationMapPreview: React.FC<LocationMapPreviewProps> = ({ coords, 
 
   // Update map center and marker when selected place coordinates change
   useEffect(() => {
-    if (!mapRef.current || !markerRef.current) return;
+    if (!mapRef.current || !markerRef.current || !coords) return;
     mapRef.current.setView([coords.lat, coords.lng], 15, { animate: true });
     markerRef.current.setLatLng([coords.lat, coords.lng]);
-  }, [coords.lat, coords.lng]);
+  }, [coords?.lat, coords?.lng]);
 
   const handleZoomIn = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -115,8 +115,19 @@ export const LocationMapPreview: React.FC<LocationMapPreviewProps> = ({ coords, 
 
   const handleRecenter = (e: React.MouseEvent) => {
     e.stopPropagation();
-    mapRef.current?.setView([coords.lat, coords.lng], 15, { animate: true });
+    if (coords) {
+      mapRef.current?.setView([coords.lat, coords.lng], 15, { animate: true });
+    }
   };
+
+  if (!coords) {
+    return (
+      <div className="relative w-full h-full min-h-[100px] select-none bg-slate-100 flex flex-col items-center justify-center p-2 text-center text-slate-400">
+        <Crosshair className="w-5 h-5 text-slate-400 animate-pulse mb-1" />
+        <span className="text-[10px] font-medium leading-tight">GPS pending</span>
+      </div>
+    );
+  }
 
   return (
     <div className="relative w-full h-full min-h-[100px] select-none bg-slate-100">
@@ -171,3 +182,11 @@ export const LocationMapPreview: React.FC<LocationMapPreviewProps> = ({ coords, 
     </div>
   );
 };
+
+export const LocationMapPreview = React.memo(
+  LocationMapPreviewComponent,
+  (prev, next) =>
+    prev.coords?.lat === next.coords?.lat &&
+    prev.coords?.lng === next.coords?.lng &&
+    prev.name === next.name
+);

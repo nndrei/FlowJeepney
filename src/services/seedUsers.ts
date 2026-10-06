@@ -11,6 +11,34 @@ export interface PreconfiguredAccount {
 
 export const PRECONFIGURED_ACCOUNTS: PreconfiguredAccount[] = [
   {
+    email: 'admin@flowjeep.ph',
+    password: 'AdminPass123!',
+    profile: {
+      name: 'System Administrator',
+      email: 'admin@flowjeep.ph',
+      role: 'admin',
+      cooperative: 'MAVANODA Transport Cooperative',
+      createdAt: 1775088000000,
+    },
+  },
+  {
+    email: 'driver@flowjeep.ph',
+    password: 'DriverPass123!',
+    profile: {
+      name: 'Mang Rodolfo Santos',
+      email: 'driver@flowjeep.ph',
+      role: 'driver',
+      driverId: 'DRV-0482',
+      assignedJeepneyId: 'JEEP-NCR-0482',
+      assignedRouteId: 'route-1',
+      assignedPlate: 'NDL-8421',
+      cooperative: 'MAVANODA Transport Cooperative',
+      licenseNumber: 'N03-14-884210',
+      phone: '+63 917 555 0192',
+      createdAt: 1775088000000,
+    },
+  },
+  {
     email: 'commuter@flowjeep.ph',
     password: 'CommuterPass123!',
     profile: {
@@ -24,11 +52,13 @@ export const PRECONFIGURED_ACCOUNTS: PreconfiguredAccount[] = [
     email: 'operator@flowjeep.com',
     password: 'OperatorPass123!',
     profile: {
-      name: 'MAVANODA Dispatcher',
+      name: 'MAVANODA Driver',
       email: 'operator@flowjeep.com',
-      role: 'operator',
+      role: 'driver',
+      driverId: 'DRV-0482',
       operatorId: 'OP-MAVANODA-01',
-      assignedRouteId: 'route-malinta-novaliches',
+      assignedJeepneyId: 'JEEP-NCR-0482',
+      assignedRouteId: 'route-1',
       assignedPlate: 'NDL-8421',
       cooperative: 'MAVANODA Transport Cooperative',
       createdAt: 1775088000000,
