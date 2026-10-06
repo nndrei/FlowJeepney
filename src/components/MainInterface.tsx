@@ -441,9 +441,21 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({
   // Transit center reference point
   const defaultCenter: [number, number] = [14.6538, 121.0505];
 
-  // 1. Dedicated Road-Snapped Pickup Point & Persistence
+  // 1. Dedicated Road-Snapped Pickup Point & Persistence (Default to commuter's live location)
   const [pickupCoords, setPickupCoords] = useState<{ lat: number; lng: number } | null>(() => {
     if (typeof window !== 'undefined') {
+      const userSaved = localStorage.getItem('flowjeep_saved_coords');
+      if (userSaved) {
+        try {
+          const parsedUser = JSON.parse(userSaved);
+          if (parsedUser && typeof parsedUser.lat === 'number' && typeof parsedUser.lng === 'number') {
+            const projected = projectToNearestCorridor(parsedUser.lat, parsedUser.lng);
+            return { lat: projected.lat, lng: projected.lng };
+          }
+        } catch {
+          // ignore
+        }
+      }
       const saved = localStorage.getItem('flowjeep_pickup_coords');
       if (saved) {
         try {
@@ -461,6 +473,18 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({
 
   const [pickupStopName, setPickupStopName] = useState<string>(() => {
     if (typeof window !== 'undefined') {
+      const userSaved = localStorage.getItem('flowjeep_saved_coords');
+      if (userSaved) {
+        try {
+          const parsedUser = JSON.parse(userSaved);
+          if (parsedUser && typeof parsedUser.lat === 'number' && typeof parsedUser.lng === 'number') {
+            const projected = projectToNearestCorridor(parsedUser.lat, parsedUser.lng);
+            return projected.isSnapped ? `Near ${projected.corridorName}` : 'Current Location';
+          }
+        } catch {
+          // ignore
+        }
+      }
       const saved = localStorage.getItem('flowjeep_pickup_location_name');
       if (saved) return saved;
     }
@@ -470,6 +494,18 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({
 
   const [pickupInput, setPickupInput] = useState<string>(() => {
     if (typeof window !== 'undefined') {
+      const userSaved = localStorage.getItem('flowjeep_saved_coords');
+      if (userSaved) {
+        try {
+          const parsedUser = JSON.parse(userSaved);
+          if (parsedUser && typeof parsedUser.lat === 'number' && typeof parsedUser.lng === 'number') {
+            const projected = projectToNearestCorridor(parsedUser.lat, parsedUser.lng);
+            return projected.isSnapped ? `Near ${projected.corridorName}` : 'Current Location';
+          }
+        } catch {
+          // ignore
+        }
+      }
       const saved = localStorage.getItem('flowjeep_pickup_location_name');
       if (saved) return saved;
     }
@@ -494,12 +530,18 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({
   const watchIdRef = useRef<number | null>(null);
 
   // Synchronized Coordinate and Handler Refs to avoid stale closures in Leaflet events
+  const userCoordsRef = useRef<{ lat: number; lng: number } | null>(userCoords);
+  const isInitialGpsFixRef = useRef<boolean>(true);
   const pickupCoordsRef = useRef<{ lat: number; lng: number } | null>(pickupCoords);
   const destinationCoordsRef = useRef<{ lat: number; lng: number } | null>(destinationCoords);
   const handleSetPickupPointRef = useRef<(rawLat: number, rawLng: number, explicitName?: string, animate?: boolean) => void>(() => {});
   const handleSetDestinationPointRef = useRef<(rawLat: number, rawLng: number, explicitName?: string, animate?: boolean) => void>(() => {});
   const isSearchActiveRef = useRef<boolean>(isSearchActive);
   const activeFieldRef = useRef<'pickup' | 'destination'>(activeField);
+
+  useEffect(() => {
+    userCoordsRef.current = userCoords;
+  }, [userCoords]);
 
   useEffect(() => {
     pickupCoordsRef.current = pickupCoords;
@@ -639,6 +681,7 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({
           }).addTo(map);
 
           marker.on('dragend', (e) => {
+            isInitialGpsFixRef.current = false;
             const pos = e.target.getLatLng();
             handleSetPickupPointRef.current(pos.lat, pos.lng, undefined, false);
           });
@@ -871,6 +914,7 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({
     }
 
     const newCoords = { lat, lng };
+    userCoordsRef.current = newCoords;
     setUserCoords(newCoords);
     try {
       localStorage.setItem('flowjeep_saved_coords', JSON.stringify(newCoords));
@@ -887,7 +931,7 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({
   };
 
   // Graceful device GPS acquisition
-  const requestDeviceGps = (forceCenter = false) => {
+  const requestDeviceGps = (forceCenter = false, updatePickup = false) => {
     if (!navigator.geolocation) return;
 
     setIsLocating(true);
@@ -899,9 +943,11 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({
 
         updateUserLivePosition(latitude, longitude, accuracy, forceCenter);
 
-        // If no pickup is currently set, snap to nearest corridor synchronously
-        if (!pickupCoords) {
-          handleSetPickupPoint(latitude, longitude, undefined, forceCenter);
+        // Draggable pickup pin defaults to current user location of passenger on initial fix,
+        // or whenever explicitly requested (e.g. clicking "go to current location")
+        if (isInitialGpsFixRef.current || updatePickup || forceCenter) {
+          isInitialGpsFixRef.current = false;
+          handleSetPickupPointRef.current(latitude, longitude, 'Current Location', forceCenter);
         }
 
         if (watchIdRef.current !== null) {
@@ -921,8 +967,8 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({
       },
       () => {
         setIsLocating(false);
-        if (forceCenter && pickupCoords && mapInstanceRef.current) {
-          mapInstanceRef.current.panTo([pickupCoords.lat, pickupCoords.lng], {
+        if (forceCenter && pickupCoordsRef.current && mapInstanceRef.current) {
+          mapInstanceRef.current.panTo([pickupCoordsRef.current.lat, pickupCoordsRef.current.lng], {
             animate: true,
             duration: 0.4,
           });
@@ -1007,6 +1053,7 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({
 
       // Instant Synchronous Snapping on dragend
       pickupMarker.on('dragend', (e) => {
+        isInitialGpsFixRef.current = false;
         const pos = e.target.getLatLng();
         handleSetPickupPointRef.current(pos.lat, pos.lng, undefined, false);
       });
@@ -1019,6 +1066,7 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({
       if (isSearchActiveRef.current && activeFieldRef.current === 'destination') {
         handleSetDestinationPointRef.current(e.latlng.lat, e.latlng.lng, undefined, false);
       } else {
+        isInitialGpsFixRef.current = false;
         handleSetPickupPointRef.current(e.latlng.lat, e.latlng.lng, undefined, false);
       }
     });
@@ -1359,10 +1407,17 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({
   };
 
   const handleRecenter = () => {
-    if (userCoords && mapInstanceRef.current) {
-      mapInstanceRef.current.panTo([userCoords.lat, userCoords.lng], { animate: true, duration: 0.6 });
+    // 1. Immediately move the draggable pickup pin to the current user location and pan map
+    if (userCoordsRef.current) {
+      handleSetPickupPointRef.current(
+        userCoordsRef.current.lat,
+        userCoordsRef.current.lng,
+        'Current Location',
+        true
+      );
     }
-    requestDeviceGps(true);
+    // 2. Fetch fresh device GPS fix and ensure pickup pin snaps to that location
+    requestDeviceGps(true, true);
   };
 
   const handleTabClick = (tab: 'home' | 'waiting' | 'forecast' | 'profile') => {
@@ -1717,8 +1772,7 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({
                                 if (userCoords) {
                                   handleSetPickupPoint(userCoords.lat, userCoords.lng, 'Current Location', true);
                                 } else {
-                                  requestDeviceGps(true);
-                                  handleSetPickupPoint(defaultCenter[0], defaultCenter[1], 'Current Location', true);
+                                  requestDeviceGps(true, true);
                                 }
                                 if (!destinationCoords) {
                                   handleFocusField('destination');
