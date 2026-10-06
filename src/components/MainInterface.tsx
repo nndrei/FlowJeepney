@@ -24,6 +24,7 @@ import { NavigationDrawer } from './NavigationDrawer';
 import { ForecastScreen } from './forecast/ForecastScreen';
 import { WaitingScreen } from './waiting/WaitingScreen';
 import { subscribeLiveTelemetry } from '../services/databaseService';
+import { LiveTelemetryRecord } from '../types/database';
 import {
   filterVehiclesForJourney,
   projectToNearestCorridor,
@@ -1083,8 +1084,8 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({
     };
   }, []);
 
-  // Real Live Vehicle Fleet Telemetry (empty by default until real units stream)
-  const [liveVehicles, setLiveVehicles] = useState<ModernJeepneyVehicle[]>(() => {
+  // Real Live Vehicle Fleet Telemetry (raw records from Firebase RTDB)
+  const [rawTelemetries, setRawTelemetries] = useState<LiveTelemetryRecord[]>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('flowjeep_live_telemetry');
       if (saved) {
@@ -1099,30 +1100,27 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({
     return [];
   });
 
+  // Active time ticker: automatically prunes offline vehicles if ESP32 powers down
+  const [currentTime, setCurrentTime] = useState<number>(() => Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 3000);
+    return () => clearInterval(timer);
+  }, []);
+
   // Listen for real-time telemetry updates from Firebase Realtime Database
   useEffect(() => {
     let unsubscribe: (() => void) | null = null;
     try {
       unsubscribe = subscribeLiveTelemetry((records) => {
-        const parsedList: ModernJeepneyVehicle[] = records.map((tel) => {
-          const coord: [number, number] = tel.currentCoord || [14.6544, 120.9839];
-          return {
-            id: tel.jeepneyId,
-            routeId: tel.routeId || 'route-1',
-            routeCode: tel.routeCode || 'Route 1',
-            routeName: tel.routeName || 'Baclaran – Monumento',
-            plateNumber: tel.plateNumber || 'NDL-8421',
-            model: 'Modern Jeepney',
-            isAircon: true,
-            totalSeats: Number(tel.totalSeats) || 22,
-            occupiedSeats: Number(tel.occupiedSeats) || 0,
-            standingAllowed: true,
-            speedKmh: Number(tel.speedKmh) || 20,
-            currentCoord: coord,
-            headingDegrees: Number(tel.headingDegrees) || 0,
-          };
-        });
-        setLiveVehicles(parsedList);
+        setRawTelemetries(records);
+        try {
+          localStorage.setItem('flowjeep_live_telemetry', JSON.stringify(records));
+        } catch {
+          // ignore
+        }
       });
     } catch (err) {
       console.warn('[Firebase RTDB] Live telemetry subscription notice:', err);
@@ -1132,6 +1130,39 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({
       if (unsubscribe) unsubscribe();
     };
   }, []);
+
+  // Derived active fleet: immediately drops vehicles when ESP32 powers off or is marked offline
+  const liveVehicles = useMemo<ModernJeepneyVehicle[]>(() => {
+    const HEARTBEAT_TIMEOUT_MS = 20000; // 20s heartbeat staleness window
+    return rawTelemetries
+      .filter((tel) => {
+        // 1. Explicit offline flag
+        if (tel.isOnline === false) return false;
+        // 2. Staleness timeout: if last heartbeat is older than 20 seconds, the ESP32 is powered off
+        if (tel.lastUpdate && currentTime - tel.lastUpdate > HEARTBEAT_TIMEOUT_MS) {
+          return false;
+        }
+        return true;
+      })
+      .map((tel) => {
+        const coord: [number, number] = tel.currentCoord || [14.6544, 120.9839];
+        return {
+          id: tel.jeepneyId,
+          routeId: tel.routeId || 'route-1',
+          routeCode: tel.routeCode || 'Route 1',
+          routeName: tel.routeName || 'Baclaran – Monumento',
+          plateNumber: tel.plateNumber || 'NDL-8421',
+          model: 'Modern Jeepney',
+          isAircon: true,
+          totalSeats: Number(tel.totalSeats) || 22,
+          occupiedSeats: Number(tel.occupiedSeats) || 0,
+          standingAllowed: true,
+          speedKmh: Number(tel.speedKmh) || 20,
+          currentCoord: coord,
+          headingDegrees: Number(tel.headingDegrees) || 0,
+        };
+      });
+  }, [rawTelemetries, currentTime]);
 
   // Live Vehicle Filtering: Strictly by pickup AND active destination with actual live vehicle telemetry
   const activeFleet = liveVehicles;

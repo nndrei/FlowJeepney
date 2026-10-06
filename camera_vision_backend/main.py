@@ -238,6 +238,20 @@ def main():
         except Exception as e:
             logger.debug(f"[Firebase Sync Notice] {e}")
 
+    disconnect_start_time = None
+    is_marked_offline = False
+
+    def mark_offline():
+        if not ENABLE_FIREBASE_SYNC:
+            return
+        now_ms = int(time.time() * 1000)
+        try:
+            requests.patch(FIREBASE_TELEMETRY_URL, json={"isOnline": False, "lastUpdate": now_ms}, timeout=2.0)
+            requests.patch(FIREBASE_DEVICE_URL, json={"cameraStatus": "DISCONNECTED", "lastHeartbeat": now_ms}, timeout=2.0)
+            logger.info(f"[Firebase Sync] ESP32-CAM stream dropped -> Unit {JEEPNEY_ID} marked offline")
+        except Exception as err:
+            logger.debug(f"[Firebase Offline Sync Notice] {err}")
+
     # Immediately push active heartbeat to Firebase upon camera launch
     sync_firebase(0, is_heartbeat=True)
     logger.info(f"[Firebase Initialized] ESP32-CAM active: {ESP32_CAM_IP} -> Unit {JEEPNEY_ID}")
@@ -247,6 +261,12 @@ def main():
             ok, frame = camera.read()
             if not ok or frame is None:
                 if camera.is_live:
+                    if disconnect_start_time is None:
+                        disconnect_start_time = time.time()
+                    elif not is_marked_offline and (time.time() - disconnect_start_time >= 4.0):
+                        mark_offline()
+                        is_marked_offline = True
+
                     # ESP32-CAM / webcam hiccup: keep the window alive while it reconnects
                     status = "WAITING FOR CAMERA"
                     placeholder = np.zeros((FRAME_HEIGHT, FRAME_WIDTH, 3), dtype=np.uint8)
@@ -263,6 +283,14 @@ def main():
                     continue
                 logger.warning("End of video / camera read failed, stopping.")
                 break
+
+            if disconnect_start_time is not None:
+                disconnect_start_time = None
+                if is_marked_offline:
+                    is_marked_offline = False
+                    sync_firebase(counter.get_stats()["current_passenger_count"], is_heartbeat=True)
+                    logger.info(f"[Firebase Sync] ESP32-CAM reconnected -> Unit {JEEPNEY_ID} marked online")
+
             status = "RUNNING"
 
             tracks = tracker.update(frame)
@@ -338,6 +366,7 @@ def main():
                 recent_toast = f"SNAPSHOT SAVED"
                 toast_timer = time.time()
     finally:
+        mark_offline()
         camera.stop()
         event_logger.close()
         cv2.destroyAllWindows()
