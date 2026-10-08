@@ -19,6 +19,8 @@ export interface FlowJeepHistoricalWeatherData {
   condition: string;
   description: string;
   iconType: WeatherIconCategory;
+  dailyHighC?: number;
+  dailyLowC?: number;
   date: string; // YYYY-MM-DD
   sourceType: 'historical';
   sourceLabel: string;
@@ -178,6 +180,8 @@ export async function fetchOpenMeteoHistoricalWeather(
     condition,
     description,
     iconType,
+    dailyHighC: dayTemps.length > 0 ? Math.round(Math.max(...dayTemps)) : undefined,
+    dailyLowC: dayTemps.length > 0 ? Math.round(Math.min(...dayTemps)) : undefined,
     date: isoDate,
     sourceType: 'historical',
     sourceLabel: 'Actual Observation (Historical)',

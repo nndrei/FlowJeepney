@@ -8,9 +8,10 @@ import { OnboardingFlow } from './components/OnboardingFlow';
 import { AuthScreen } from './components/AuthScreen';
 import { MainInterface } from './components/MainInterface';
 import { OperatorBlankScreen } from './components/operator/OperatorBlankScreen';
+import { DriverInterface } from './components/driver/DriverInterface';
 import { AuthUser } from './types/auth';
 import { logoutUser } from './services/authService';
-import { initializeDatabaseDefaults } from './services/databaseService';
+import { initializeDatabaseDefaults, subscribeUserProfile } from './services/databaseService';
 type AppScreen = 'onboarding' | 'auth' | 'main';
 
 export default function App() {
@@ -35,6 +36,24 @@ export default function App() {
     }
     return null;
   });
+
+  // Keep currentUser in sync with Firebase RTDB in real time
+  useEffect(() => {
+    if (!currentUser?.uid && !currentUser?.email) return;
+    const unsub = subscribeUserProfile(currentUser?.uid || '', currentUser?.email, (live) => {
+      if (live) {
+        setCurrentUser((prev) => {
+          if (!prev) return null;
+          const merged = { ...prev, ...live };
+          try {
+            localStorage.setItem('flowjeep_user', JSON.stringify(merged));
+          } catch {}
+          return merged;
+        });
+      }
+    });
+    return () => unsub();
+  }, [currentUser?.uid, currentUser?.email]);
 
   // Preserve session if already stored in localStorage; otherwise start on onboarding
   const [currentScreen, setCurrentScreen] = useState<AppScreen>(() => {
@@ -94,8 +113,10 @@ export default function App() {
         )}
 
         {currentScreen === 'main' && (
-          (currentUser?.role === 'admin' || currentUser?.role === 'driver' || currentUser?.role === 'operator') ? (
+          currentUser?.role === 'admin' ? (
             <OperatorBlankScreen user={currentUser} onLogout={handleLogout} />
+          ) : (currentUser?.role === 'driver' || currentUser?.role === 'operator') ? (
+            <DriverInterface user={currentUser} onLogout={handleLogout} />
           ) : (
             <MainInterface user={currentUser} onLogout={handleLogout} />
           )

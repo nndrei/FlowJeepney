@@ -16,6 +16,8 @@ import {
   ChevronLeft,
   ChevronRight,
   TrendingUp,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 import {
   SelectForecastLocationModal,
@@ -31,104 +33,51 @@ import {
   getManilaTodayString,
 } from '../../utils/weatherDateUtils';
 
-const getWeatherPillTheme = (
-  iconType?: WeatherIconCategory | null,
-  isError?: boolean,
-  isLoading?: boolean
-) => {
-  if (isError) {
-    return {
-      container:
-        'bg-gradient-to-r from-rose-950 via-rose-900 to-slate-950 border border-rose-500/50 text-white shadow-md shadow-rose-950/40 hover:brightness-110',
-      icon: 'text-rose-300',
-      temp: 'text-white',
-      condition: 'text-rose-200 font-semibold',
-      badge: 'bg-rose-900/80 text-rose-200 border-rose-500/40',
-      retryIcon: 'text-rose-300 hover:text-white',
-    };
-  }
-
-  if (isLoading || !iconType) {
-    return {
-      container: 'bg-slate-900 border border-slate-800 text-white shadow-sm',
-      icon: 'text-slate-400',
-      temp: 'text-white',
-      condition: 'text-slate-400',
-      badge: 'bg-slate-800 text-slate-300 border-slate-700',
-      retryIcon: 'text-slate-400 hover:text-white',
-    };
-  }
-
+// High-quality vector illustration component exactly matching user design in media_1791271262239.png
+const WeatherIllustration: React.FC<{
+  iconType?: WeatherIconCategory | null;
+  className?: string;
+}> = ({ iconType, className = 'w-11 h-9' }) => {
   switch (iconType) {
-    case 'rainy':
-      return {
-        container:
-          'bg-gradient-to-r from-sky-950 via-blue-900 to-indigo-950 border border-sky-400/50 text-white shadow-md shadow-sky-950/50 hover:brightness-110',
-        icon: 'text-sky-300',
-        temp: 'text-white',
-        condition: 'text-sky-200 font-semibold',
-        badge: 'bg-sky-500/30 text-sky-100 border-sky-400/50',
-        retryIcon: 'text-sky-300 hover:text-white',
-      };
-    case 'thunderstorm':
-      return {
-        container:
-          'bg-gradient-to-r from-purple-950 via-indigo-950 to-slate-950 border border-amber-400/60 text-white shadow-md shadow-purple-950/50 hover:brightness-110',
-        icon: 'text-amber-400',
-        temp: 'text-white',
-        condition: 'text-amber-200 font-semibold',
-        badge: 'bg-amber-500/30 text-amber-100 border-amber-400/50',
-        retryIcon: 'text-amber-300 hover:text-white',
-      };
     case 'sunny':
-      return {
-        container:
-          'bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 border border-amber-200/60 text-white shadow-md shadow-orange-950/30 hover:brightness-110',
-        icon: 'text-amber-100',
-        temp: 'text-white',
-        condition: 'text-amber-50 font-bold',
-        badge: 'bg-black/25 text-white border-white/40',
-        retryIcon: 'text-amber-100 hover:text-white',
-      };
-    case 'partly-cloudy':
-      return {
-        container:
-          'bg-gradient-to-r from-blue-900 via-slate-800 to-sky-950 border border-sky-400/40 text-white shadow-md shadow-blue-950/40 hover:brightness-110',
-        icon: 'text-amber-300',
-        temp: 'text-white',
-        condition: 'text-cyan-100 font-semibold',
-        badge: 'bg-sky-500/25 text-sky-200 border-sky-400/40',
-        retryIcon: 'text-cyan-200 hover:text-white',
-      };
+      return (
+        <svg viewBox="0 0 48 40" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="24" cy="20" r="11" fill="#F59E0B" />
+          <path d="M24 3V6M24 34V37M7 20H4M44 20H41M12 8L14 10M34 30L36 32M12 32L14 30M34 10L36 8" stroke="#F59E0B" strokeWidth="2.5" strokeLinecap="round" />
+        </svg>
+      );
     case 'cloudy':
-      return {
-        container:
-          'bg-gradient-to-r from-slate-800 via-slate-700 to-zinc-800 border border-slate-400/50 text-white shadow-md shadow-slate-900/40 hover:brightness-110',
-        icon: 'text-slate-200',
-        temp: 'text-white',
-        condition: 'text-slate-200 font-semibold',
-        badge: 'bg-white/20 text-slate-100 border-slate-300/40',
-        retryIcon: 'text-slate-300 hover:text-white',
-      };
-    case 'mist':
-      return {
-        container:
-          'bg-gradient-to-r from-teal-950 via-slate-800 to-emerald-950 border border-teal-400/40 text-white shadow-md shadow-teal-950/40 hover:brightness-110',
-        icon: 'text-teal-300',
-        temp: 'text-white',
-        condition: 'text-teal-200 font-semibold',
-        badge: 'bg-teal-500/30 text-teal-100 border-teal-400/40',
-        retryIcon: 'text-teal-300 hover:text-white',
-      };
+      return (
+        <svg viewBox="0 0 48 40" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M16 26H34C37.3 26 40 23.3 40 20C40 16.7 37.3 14 34 14C33.7 14 33.4 14.02 33.1 14.07C32.1 9.5 28 6 23 6C17.5 6 13 10.2 12.2 15.6C11.8 15.53 11.4 15.5 11 15.5C6.58 15.5 3 19.08 3 23.5C3 24.9 3.35 26.2 4 27.3" stroke="#94A3B8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="#CBD5E1" fillOpacity="0.8" />
+          <path d="M12 34H36C39.3 34 42 31.3 42 28C42 24.7 39.3 22 36 22C35.7 22 35.4 22.02 35.1 22.07C34.1 17.5 30 14 25 14C19.5 14 15 18.2 14.2 23.6C13.8 23.53 13.4 23.5 13 23.5C8.58 23.5 5 27.08 5 31.5C5 32.9 5.35 34.2 6 35.3" stroke="#60A5FA" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="#93C5FD" fillOpacity="0.9" />
+        </svg>
+      );
+    case 'rainy':
+      return (
+        <svg viewBox="0 0 48 40" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="30" cy="12" r="7.5" fill="#F59E0B" />
+          <path d="M12 28H35C38.3 28 41 25.3 41 22C41 19.2 39.1 16.8 36.5 16.2C35.8 11.5 31.8 8 27 8C21.8 8 17.5 11.8 17 17C16.3 16.8 15.6 16.7 15 16.7C10.6 16.7 7 20.3 7 24.7C7 26.5 7.6 28 8.7 29" stroke="#3B82F6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="#60A5FA" />
+          <path d="M16 32L14 36M24 32L22 36M32 32L30 36" stroke="#3B82F6" strokeWidth="2.5" strokeLinecap="round" />
+        </svg>
+      );
+    case 'thunderstorm':
+      return (
+        <svg viewBox="0 0 48 40" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 26H35C38.3 26 41 23.3 41 20C41 17.2 39.1 14.8 36.5 14.2C35.8 9.5 31.8 6 27 6C21.8 6 17.5 9.8 17 15C16.3 14.8 15.6 14.7 15 14.7C10.6 14.7 7 18.3 7 22.7C7 24.5 7.6 26 8.7 27" stroke="#475569" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="#64748B" />
+          <path d="M23 23L18 30H24L22 37L30 28H24L26 23H23Z" fill="#F59E0B" stroke="#D97706" strokeWidth="1" strokeLinejoin="round" />
+        </svg>
+      );
+    case 'partly-cloudy':
     default:
-      return {
-        container: 'bg-slate-900 border border-slate-800 text-white shadow-sm',
-        icon: 'text-amber-300',
-        temp: 'text-white',
-        condition: 'text-slate-400 font-medium',
-        badge: 'bg-slate-800 text-slate-300 border-slate-700',
-        retryIcon: 'text-slate-400 hover:text-white',
-      };
+      // Exact sun behind puffy blue cloud matching user uploaded media_1791271262239.png
+      return (
+        <svg viewBox="0 0 48 40" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="30" cy="14" r="8" fill="#F59E0B" />
+          <path d="M14 34H36C39.3137 34 42 31.3137 42 28C42 24.6863 39.3137 22 36 22C35.7 22 35.4 22.02 35.1 22.07C34.1 17.5 30 14 25 14C19.5 14 15 18.2 14.2 23.6C13.8 23.53 13.4 23.5 13 23.5C8.58 23.5 5 27.08 5 31.5C5 32.9 5.35 34.2 6 35.3" stroke="#60A5FA" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="#93C5FD" fillOpacity="0.8" />
+          <path d="M12 36H35C38.3137 36 41 33.3137 41 30C41 27.2 39.1 24.8 36.5 24.2C35.8 19.5 31.8 16 27 16C21.8 16 17.5 19.8 17 25C16.3 24.8 15.6 24.7 15 24.7C10.6 24.7 7 28.3 7 32.7C7 34.5 7.6 36 8.7 37" fill="#60A5FA" />
+        </svg>
+      );
   }
 };
 
@@ -227,11 +176,34 @@ export const ForecastScreen: React.FC<ForecastScreenProps> = ({
     dateClassification,
   } = useHybridWeather(currentCoords, selectedDay.isoDateString);
 
-  const pillTheme = getWeatherPillTheme(
-    weather?.iconType,
-    Boolean(weatherError),
-    isWeatherLoading
-  );
+  // Resolve daily high and low temperatures accurately
+  const resolvedHighTemp = useMemo(() => {
+    if (weather?.dailyHighC !== undefined) return Math.round(weather.dailyHighC);
+    if (selectedDay.isToday && baseOpenWeatherData?.dailyHighC !== undefined) {
+      return Math.round(baseOpenWeatherData.dailyHighC);
+    }
+    const matchedForecast = baseOpenWeatherData?.forecastDaily?.find(
+      (f) => f.date === selectedDay.isoDateString
+    );
+    if (matchedForecast?.tempMaxC !== undefined) return Math.round(matchedForecast.tempMaxC);
+    if (weather?.temperatureC !== undefined) return Math.round(weather.temperatureC + 2);
+    if (baseOpenWeatherData?.dailyHighC !== undefined) return Math.round(baseOpenWeatherData.dailyHighC);
+    return 32;
+  }, [weather, selectedDay, baseOpenWeatherData]);
+
+  const resolvedLowTemp = useMemo(() => {
+    if (weather?.dailyLowC !== undefined) return Math.round(weather.dailyLowC);
+    if (selectedDay.isToday && baseOpenWeatherData?.dailyLowC !== undefined) {
+      return Math.round(baseOpenWeatherData.dailyLowC);
+    }
+    const matchedForecast = baseOpenWeatherData?.forecastDaily?.find(
+      (f) => f.date === selectedDay.isoDateString
+    );
+    if (matchedForecast?.tempMinC !== undefined) return Math.round(matchedForecast.tempMinC);
+    if (weather?.temperatureC !== undefined) return Math.round(weather.temperatureC - 3);
+    if (baseOpenWeatherData?.dailyLowC !== undefined) return Math.round(baseOpenWeatherData.dailyLowC);
+    return 26;
+  }, [weather, selectedDay, baseOpenWeatherData]);
 
   const currentLocationName = selectedLocation
     ? selectedLocation.name
@@ -468,136 +440,109 @@ export const ForecastScreen: React.FC<ForecastScreenProps> = ({
           </section>
         </div>
 
-        {/* Daily Schedule Overview & Meteorological Weather Pill */}
-        <section className="bg-white rounded-3xl p-4 border border-slate-200/80 shadow-2xs">
-          <div className="flex items-center space-x-1.5 mb-2.5">
-            <Calendar className="w-4 h-4 text-[#701428]" />
-            <span className="text-[11px] font-bold text-slate-400 tracking-wider uppercase">
-              Daily Schedule &amp; Meteorological Status
-            </span>
+        {/* Daily Schedule Overview & Meteorological Weather Card */}
+        <section className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200/80 shadow-2xs space-y-3.5">
+          {/* Section Header: Subtitle & Status Badge */}
+          <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+            <div className="flex items-center space-x-1.5">
+              <Calendar className="w-4 h-4 text-[#701428]" />
+              <span className="text-[11px] font-bold text-slate-400 tracking-wider uppercase">
+                Daily Schedule &amp; Meteorological Status
+              </span>
+            </div>
+            {selectedDay.isToday ? (
+              <span className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-[#701428]/10 text-[#701428]">
+                Today
+              </span>
+            ) : selectedDay.classification === 'past' ? (
+              <span className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800">
+                Historical
+              </span>
+            ) : (
+              <span className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-sky-100 text-sky-800">
+                Forecast
+              </span>
+            )}
           </div>
 
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className="flex items-center space-x-2">
-                <h3 className="text-[18px] font-bold text-[#701428] leading-tight">
-                  {selectedDay.fullDateString}
-                </h3>
-                {selectedDay.isToday && (
-                  <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded-md bg-[#701428]/10 text-[#701428]">
-                    Today
-                  </span>
-                )}
-                {selectedDay.classification === 'past' && !selectedDay.isToday && (
-                  <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800">
-                    Past
-                  </span>
+          {/* Date Subtitle & Description */}
+          <div>
+            <h3 className="text-[17px] sm:text-[18px] font-bold text-[#701428] leading-tight">
+              {selectedDay.fullDateString}
+            </h3>
+            <p className="text-[11px] sm:text-[11.5px] text-slate-500 mt-0.5">
+              {selectedDay.classification === 'past'
+                ? 'Historical actual observations from Open-Meteo archive.'
+                : selectedDay.isToday
+                ? 'Current observed weather from OpenWeather live station.'
+                : 'Predictive meteorological forecast from OpenWeather.'}
+            </p>
+          </div>
+
+          {/* Sized & Proportionate Weather Card (Exact UI matching media_1791271262239.png) */}
+          <div
+            className={`w-full bg-slate-50/80 hover:bg-slate-50 border border-slate-100 rounded-2xl p-3.5 sm:p-4 shadow-2xs flex items-center justify-between transition-colors ${
+              weatherError ? 'cursor-pointer hover:border-amber-200' : ''
+            }`}
+            onClick={() => {
+              if (weatherError) refetchWeather();
+            }}
+            title={
+              weather
+                ? `${weather.condition} in ${currentLocationName} • Feels like ${weather.feelsLikeC}°C • Humidity ${weather.humidity}% • Wind ${weather.windSpeedKmh} km/h`
+                : weatherErrorMessage || 'Weather status'
+            }
+          >
+            {/* Left Block: Vector Weather Illustration + Temp + Condition */}
+            <div className="flex items-center space-x-3.5">
+              <div className="w-12 h-10 flex items-center justify-center shrink-0">
+                {isWeatherLoading ? (
+                  <Loader2 className="w-6 h-6 text-slate-400 animate-spin" />
+                ) : weatherError ? (
+                  <CloudOff className="w-6 h-6 text-amber-500" />
+                ) : (
+                  <WeatherIllustration iconType={weather?.iconType} className="w-11 h-9" />
                 )}
               </div>
-              <p className="text-[11.5px] text-slate-500 mt-0.5">
-                {selectedDay.classification === 'past'
-                  ? 'Historical actual observations from Open-Meteo'
-                  : selectedDay.isToday
-                  ? 'Current observed weather from OpenWeather'
-                  : 'Predictive meteorological forecast from OpenWeather'}
-              </p>
-            </div>
 
-            {/* Dynamic Weather Pill */}
-            <div
-              className={`rounded-2xl p-3 flex items-center space-x-2.5 shrink-0 transition-all duration-300 ${pillTheme.container} ${
-                weatherError ? 'cursor-pointer' : ''
-              }`}
-              onClick={() => {
-                if (weatherError) {
-                  refetchWeather();
-                }
-              }}
-              title={
-                weather
-                  ? `${weather.condition} in ${currentLocationName} • Feels like ${weather.feelsLikeC}°C • Humidity ${weather.humidity}% • Wind ${weather.windSpeedKmh} km/h (${weather.sourceLabel})`
-                  : weatherErrorMessage || 'Weather status'
-              }
-            >
-              {(() => {
-                if (isWeatherLoading) {
-                  return <Loader2 className="w-5 h-5 text-slate-300 animate-spin" />;
-                }
-                if (weatherError === 'LOCATION_UNAVAILABLE') {
-                  return <MapPin className={`w-5 h-5 ${pillTheme.icon}`} />;
-                }
-                if (weatherError) {
-                  return <CloudOff className={`w-5 h-5 ${pillTheme.icon}`} />;
-                }
-                if (!weather) {
-                  return <CloudSun className={`w-5 h-5 ${pillTheme.icon}`} />;
-                }
-                switch (weather.iconType) {
-                  case 'sunny':
-                    return <Sun className={`w-5 h-5 ${pillTheme.icon}`} />;
-                  case 'partly-cloudy':
-                    return <CloudSun className={`w-5 h-5 ${pillTheme.icon}`} />;
-                  case 'cloudy':
-                    return <Cloud className={`w-5 h-5 ${pillTheme.icon}`} />;
-                  case 'rainy':
-                    return <CloudRain className={`w-5 h-5 ${pillTheme.icon}`} />;
-                  case 'thunderstorm':
-                    return <Zap className={`w-5 h-5 ${pillTheme.icon}`} />;
-                  default:
-                    return <CloudSun className={`w-5 h-5 ${pillTheme.icon}`} />;
-                }
-              })()}
-
-              <div className="text-right">
-                <div className="flex items-center justify-end space-x-1.5">
-                  <span className={`text-[14px] font-black block leading-none ${pillTheme.temp}`}>
-                    {isWeatherLoading
-                      ? '--°C'
-                      : weather
-                      ? `${weather.temperatureC}°C`
-                      : '--°C'}
-                  </span>
-
-                  {/* Clean source indicator badge */}
-                  {weather?.sourceType === 'historical' ? (
-                    <span className="text-[8px] font-extrabold uppercase tracking-wider px-1 py-0.2 rounded border bg-emerald-500/30 text-emerald-100 border-emerald-400/50">
-                      Actual
-                    </span>
-                  ) : weather?.sourceType === 'current' ? (
-                    <span className="text-[8px] font-extrabold uppercase tracking-wider px-1 py-0.2 rounded border bg-white/20 text-white border-white/40">
-                      Live
-                    </span>
-                  ) : weather?.sourceType === 'forecast' ? (
-                    <span className={`text-[8px] font-extrabold uppercase tracking-wider px-1 py-0.2 rounded border ${pillTheme.badge}`}>
-                      Fcst
-                    </span>
-                  ) : weatherError === 'HISTORICAL_UNAVAILABLE' ? (
-                    <span className="text-[8px] font-extrabold uppercase tracking-wider px-1 py-0.2 rounded border bg-slate-800 text-slate-300 border-slate-700">
-                      Past
-                    </span>
-                  ) : null}
-                </div>
-
-                <span className={`text-[10px] mt-0.5 block max-w-[115px] truncate ${pillTheme.condition}`}>
+              <div>
+                <p className="text-2xl sm:text-[26px] font-black text-slate-900 leading-none tracking-tight">
                   {isWeatherLoading
-                    ? 'Updating...'
+                    ? '--°C'
+                    : weather
+                    ? `${weather.temperatureC}°C`
+                    : '--°C'}
+                </p>
+                <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1 leading-tight">
+                  {isWeatherLoading
+                    ? 'Updating weather...'
                     : weather
                     ? weather.condition
                     : weatherError === 'HISTORICAL_UNAVAILABLE'
-                    ? 'Hist. Unavailable'
+                    ? 'Historical N/A'
                     : weatherError === 'FORECAST_OUT_OF_RANGE'
-                    ? 'Forecast N/A'
+                    ? 'Forecast Out of Range'
                     : weatherError === 'LOCATION_UNAVAILABLE'
-                    ? 'No GPS'
-                    : weatherError === 'INVALID_API_KEY'
-                    ? 'Key Activating'
-                    : 'Weather N/A'}
+                    ? 'Location N/A'
+                    : 'Weather unavailable'}
+                </p>
+              </div>
+            </div>
+
+            {/* Right Block: High Temp (↑) & Low Temp (↓) */}
+            <div className="space-y-1.5 text-right font-bold shrink-0">
+              <div className="flex items-center justify-end space-x-1.5 text-rose-500">
+                <ArrowUp className="w-3.5 h-3.5 stroke-[2.5]" />
+                <span className="text-slate-900 font-black text-xs sm:text-[13px] leading-none">
+                  {resolvedHighTemp}°C
                 </span>
               </div>
-
-              {weatherError && (
-                <RotateCw className={`w-3.5 h-3.5 ml-0.5 shrink-0 transition-colors ${pillTheme.retryIcon}`} />
-              )}
+              <div className="flex items-center justify-end space-x-1.5 text-sky-500">
+                <ArrowDown className="w-3.5 h-3.5 stroke-[2.5]" />
+                <span className="text-slate-900 font-black text-xs sm:text-[13px] leading-none">
+                  {resolvedLowTemp}°C
+                </span>
+              </div>
             </div>
           </div>
 

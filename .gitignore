@@ -11,3 +11,4 @@ __pycache__/
 camera_vision_backend/__pycache__/
 camera_vision_backend/logs/
 camera_vision_backend/yolov8n.pt
+*.zip

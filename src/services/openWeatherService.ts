@@ -112,6 +112,8 @@ export interface FlowJeepWeatherData {
     date: string;
     dayName: string;
     tempC: number;
+    tempMaxC?: number;
+    tempMinC?: number;
     feelsLikeC: number;
     humidity: number;
     windSpeedKmh: number;
@@ -271,10 +273,16 @@ export async function fetchOpenWeatherData(
             description: 'Clear',
             icon: '01d',
           };
+          const itemTemps = slots.map((s) => s.item.main.temp);
+          const dayMaxC = Math.round(Math.max(...itemTemps));
+          const dayMinC = Math.round(Math.min(...itemTemps));
+
           forecastDaily.push({
             date: dateStr,
             dayName,
             tempC: Math.round(repItem.main.temp),
+            tempMaxC: dayMaxC,
+            tempMinC: dayMinC,
             feelsLikeC: Math.round(repItem.main.feels_like),
             humidity: repItem.main.humidity,
             windSpeedKmh: Math.round((repItem.wind?.speed ?? 0) * 3.6),

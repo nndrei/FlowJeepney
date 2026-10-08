@@ -903,89 +903,293 @@ export async function getAssignedJeepneyForDriver(
 }
 
 /**
- * Subscribes to real-time telemetry and state changes for the Driver's assigned vehicle.
- * Ensures the Driver ONLY receives updates for their assigned vehicle.
+ * Real-time listener for the logged-in User profile record in RTDB (/users).
+ * Listens continuously and triggers callback whenever admin/operator edits
+ * any field (name, cooperative, driverId, licenseNumber, phone, assignedJeepneyId, etc.) in Firebase Console.
+ */
+export function subscribeUserProfile(
+  uid: string,
+  email: string | undefined,
+  callback: (user: Partial<UserRecord> | null) => void
+): () => void {
+  const usersRef = ref(rtdb, 'users');
+
+  const onUsersChange = (snap: DataSnapshot) => {
+    if (!snap.exists()) {
+      callback(null);
+      return;
+    }
+
+    const allUsers = snap.val();
+    // 1. Direct match by key or uid
+    if (uid && allUsers[uid]) {
+      callback({ uid, ...allUsers[uid] });
+      return;
+    }
+
+    // 2. Search by uid field or email
+    const normalizedEmail = email?.trim().toLowerCase();
+    for (const key of Object.keys(allUsers)) {
+      const u = allUsers[key];
+      if (
+        (uid && (u?.uid === uid || key === uid)) ||
+        (normalizedEmail && u?.email && u.email.trim().toLowerCase() === normalizedEmail)
+      ) {
+        callback({ uid: u.uid || key, ...u });
+        return;
+      }
+    }
+
+    callback(null);
+  };
+
+  onValue(usersRef, onUsersChange);
+  return () => off(usersRef, 'value', onUsersChange);
+}
+
+export interface DriverMatchOptions {
+  email?: string;
+  driverId?: string;
+  assignedJeepneyId?: string;
+  assignedPlate?: string;
+}
+
+/**
+ * Subscribes to real-time telemetry, vehicle, route, and device changes for the Driver's assigned vehicle.
+ * Robustly matches by assignedJeepneyId, driverUid, driverId, driverEmail, or assignedPlate,
+ * and maintains continuous listeners on live_telemetry, routes, and devices nodes.
  */
 export function subscribeAssignedJeepney(
   driverUid: string,
-  callback: (bundle: DriverAssignedVehicleBundle) => void
+  callback: (bundle: DriverAssignedVehicleBundle) => void,
+  userOptions?: DriverMatchOptions
 ): () => void {
   let activeJeepneyId: string | null = null;
   let unsubTelemetry: (() => void) | null = null;
+  let unsubRoute: (() => void) | null = null;
+  let unsubDevice: (() => void) | null = null;
+
+  let currentJeepney: JeepneyRecord | null = null;
+  let currentTelemetry: LiveTelemetryRecord | null = null;
+  let currentDevice: DeviceRecord | null = null;
+  let currentRoute: RouteRecord | null = null;
+
+  const emit = () => {
+    callback({
+      jeepney: currentJeepney,
+      telemetry: currentTelemetry,
+      device: currentDevice,
+      route: currentRoute,
+    });
+  };
 
   const jeepneysRef = ref(rtdb, 'jeepneys');
 
-  const onJeepneysUpdate = async (snapshot: DataSnapshot) => {
+  const onJeepneysUpdate = (snapshot: DataSnapshot) => {
     let assignedJeepney: JeepneyRecord | null = null;
 
     if (snapshot.exists()) {
       const allJeeps = snapshot.val();
-      for (const key of Object.keys(allJeeps)) {
-        if (allJeeps[key]?.currentDriverUid === driverUid) {
-          assignedJeepney = allJeeps[key] as JeepneyRecord;
-          break;
+      const keys = Object.keys(allJeeps);
+
+      // Priority 1: Match by user's assignedJeepneyId
+      if (userOptions?.assignedJeepneyId) {
+        for (const k of keys) {
+          if (k === userOptions.assignedJeepneyId || allJeeps[k]?.id === userOptions.assignedJeepneyId) {
+            assignedJeepney = { ...allJeeps[k], id: allJeeps[k]?.id || k };
+            break;
+          }
         }
+      }
+
+      // Priority 2: Match by driverUid / currentDriverUid / assignedDriverUid
+      if (!assignedJeepney && driverUid) {
+        for (const k of keys) {
+          const j = allJeeps[k];
+          if (
+            j?.currentDriverUid === driverUid ||
+            j?.driverUid === driverUid ||
+            j?.assignedDriverUid === driverUid
+          ) {
+            assignedJeepney = { ...j, id: j?.id || k };
+            break;
+          }
+        }
+      }
+
+      // Priority 3: Match by driverId
+      if (!assignedJeepney && userOptions?.driverId) {
+        for (const k of keys) {
+          const j = allJeeps[k];
+          if (j?.driverId === userOptions.driverId || j?.currentDriverId === userOptions.driverId) {
+            assignedJeepney = { ...j, id: j?.id || k };
+            break;
+          }
+        }
+      }
+
+      // Priority 4: Match by driverEmail
+      if (!assignedJeepney && userOptions?.email) {
+        const normEmail = userOptions.email.trim().toLowerCase();
+        for (const k of keys) {
+          const j = allJeeps[k];
+          if (j?.driverEmail && j.driverEmail.trim().toLowerCase() === normEmail) {
+            assignedJeepney = { ...j, id: j?.id || k };
+            break;
+          }
+        }
+      }
+
+      // Priority 5: Match by assignedPlate
+      if (!assignedJeepney && userOptions?.assignedPlate) {
+        const normPlate = userOptions.assignedPlate.replace(/\s+/g, '').toUpperCase();
+        for (const k of keys) {
+          const j = allJeeps[k];
+          if (
+            (j?.plateNumber && j.plateNumber.replace(/\s+/g, '').toUpperCase() === normPlate) ||
+            (j?.plate && j.plate.replace(/\s+/g, '').toUpperCase() === normPlate)
+          ) {
+            assignedJeepney = { ...j, id: j?.id || k };
+            break;
+          }
+        }
+      }
+
+      // Priority 6: Single vehicle fallback for easy manual database testing
+      if (!assignedJeepney && keys.length === 1 && driverUid) {
+        assignedJeepney = { ...allJeeps[keys[0]], id: allJeeps[keys[0]]?.id || keys[0] };
       }
     }
 
     if (!assignedJeepney) {
-      // Driver is unassigned
-      if (unsubTelemetry) {
-        unsubTelemetry();
-        unsubTelemetry = null;
-      }
+      if (unsubTelemetry) { unsubTelemetry(); unsubTelemetry = null; }
+      if (unsubRoute) { unsubRoute(); unsubRoute = null; }
+      if (unsubDevice) { unsubDevice(); unsubDevice = null; }
       activeJeepneyId = null;
-      callback({ jeepney: null, telemetry: null, device: null, route: null });
+      currentJeepney = null;
+      currentTelemetry = null;
+      currentDevice = null;
+      currentRoute = null;
+      emit();
       return;
     }
 
-    // Vehicle found
+    // Normalize vehicle fields
+    assignedJeepney.plateNumber = assignedJeepney.plateNumber || (assignedJeepney as any).plate || '';
+    assignedJeepney.model = assignedJeepney.model || (assignedJeepney as any).unitModel || '';
+    assignedJeepney.totalSeats = Number(assignedJeepney.totalSeats || (assignedJeepney as any).capacity || 22);
+
+    currentJeepney = assignedJeepney;
     const jId = assignedJeepney.id;
 
-    // Fetch device and route once
-    let device: DeviceRecord | null = null;
-    if (assignedJeepney.deviceId) {
-      try {
-        const devSnap = await get(ref(rtdb, `devices/${assignedJeepney.deviceId}`));
-        if (devSnap.exists()) device = devSnap.val() as DeviceRecord;
-      } catch {}
-    }
-
-    let route: RouteRecord | null = null;
-    if (assignedJeepney.assignedRouteId) {
-      try {
-        const routeSnap = await get(ref(rtdb, `routes/${assignedJeepney.assignedRouteId}`));
-        if (routeSnap.exists()) route = routeSnap.val() as RouteRecord;
-      } catch {}
-    }
-
-    // If jeepney changed, resubscribe telemetry
+    // Resubscribe live telemetry & routes & device if vehicle changed
     if (activeJeepneyId !== jId) {
-      if (unsubTelemetry) unsubTelemetry();
       activeJeepneyId = jId;
 
+      // 1. Telemetry Listener
+      if (unsubTelemetry) { unsubTelemetry(); unsubTelemetry = null; }
       const telRef = ref(rtdb, `live_telemetry/${jId}`);
       const telListener = (telSnap: DataSnapshot) => {
-        const telemetry = telSnap.exists()
-          ? (telSnap.val() as LiveTelemetryRecord)
-          : null;
-        callback({
-          jeepney: assignedJeepney,
-          telemetry,
-          device,
-          route,
-        });
+        if (telSnap.exists()) {
+          const val = telSnap.val();
+          currentTelemetry = {
+            jeepneyId: jId,
+            occupiedSeats: Number(val.occupiedSeats ?? val.passengerCount ?? val.passengers ?? val.currentCount ?? 0),
+            totalSeats: Number(val.totalSeats ?? val.capacity ?? currentJeepney?.totalSeats ?? 22),
+            speedKmh: Number(val.speedKmh ?? val.speed ?? 0),
+            timestamp: Number(val.timestamp ?? val.lastUpdated ?? Date.now()),
+            currentCoord: val.currentCoord || (val.lat && val.lng ? [val.lat, val.lng] : undefined),
+            status: val.status || 'IN_SERVICE',
+            networkType: val.networkType || val.network || 'LTE',
+            wifiRssi: val.wifiRssi ?? val.rssi ?? undefined,
+            etaMin: val.etaMin,
+          };
+        } else {
+          // Check embedded telemetry on vehicle
+          const embedded = currentJeepney as any;
+          if (embedded?.speedKmh !== undefined || embedded?.occupiedSeats !== undefined) {
+            currentTelemetry = {
+              jeepneyId: jId,
+              occupiedSeats: Number(embedded.occupiedSeats ?? 0),
+              totalSeats: Number(embedded.totalSeats ?? 22),
+              speedKmh: Number(embedded.speedKmh ?? 0),
+              timestamp: Number(embedded.timestamp ?? Date.now()),
+              currentCoord: embedded.currentCoord,
+              status: 'IN_SERVICE',
+            };
+          } else {
+            currentTelemetry = null;
+          }
+        }
+        emit();
       };
       onValue(telRef, telListener);
       unsubTelemetry = () => off(telRef, 'value', telListener);
+
+      // 2. Real-time Route Listener
+      if (unsubRoute) { unsubRoute(); unsubRoute = null; }
+      const routeId = assignedJeepney.assignedRouteId;
+      if (routeId) {
+        const routeRef = ref(rtdb, `routes/${routeId}`);
+        const routeListener = (rSnap: DataSnapshot) => {
+          if (rSnap.exists()) {
+            const rVal = rSnap.val();
+            let stopsObj = rVal.stops;
+            if (Array.isArray(rVal.stops)) {
+              stopsObj = {};
+              rVal.stops.forEach((s: any, idx: number) => {
+                if (typeof s === 'string') {
+                  stopsObj[`stop-${idx}`] = { name: s, sequenceOrder: idx + 1 };
+                } else if (s && typeof s === 'object') {
+                  stopsObj[`stop-${idx}`] = { ...s, sequenceOrder: s.sequenceOrder ?? idx + 1 };
+                }
+              });
+            }
+            currentRoute = {
+              id: routeId,
+              routeCode: rVal.routeCode || '',
+              name: rVal.name || `${rVal.origin || ''} – ${rVal.destination || ''}`,
+              origin: rVal.origin || '',
+              destination: rVal.destination || '',
+              totalDistanceKm: Number(rVal.totalDistanceKm || 0),
+              estimatedDurationMin: Number(rVal.estimatedDurationMin || 0),
+              baseFare: Number(rVal.baseFare || 13),
+              status: rVal.status || 'ACTIVE',
+              direction: rVal.direction || 'Northbound',
+              stops: stopsObj,
+            } as any;
+          } else {
+            currentRoute = null;
+          }
+          emit();
+        };
+        onValue(routeRef, routeListener);
+        unsubRoute = () => off(routeRef, 'value', routeListener);
+      } else {
+        currentRoute = null;
+      }
+
+      // 3. Real-time Device Listener
+      if (unsubDevice) { unsubDevice(); unsubDevice = null; }
+      const devId = assignedJeepney.deviceId;
+      if (devId) {
+        const devRef = ref(rtdb, `devices/${devId}`);
+        const devListener = (dSnap: DataSnapshot) => {
+          if (dSnap.exists()) {
+            currentDevice = dSnap.val() as DeviceRecord;
+          } else {
+            currentDevice = null;
+          }
+          emit();
+        };
+        onValue(devRef, devListener);
+        unsubDevice = () => off(devRef, 'value', devListener);
+      } else {
+        currentDevice = null;
+      }
     } else {
-      // Re-trigger with updated jeepney
-      callback({
-        jeepney: assignedJeepney,
-        telemetry: null,
-        device,
-        route,
-      });
+      // Re-emit updated vehicle without erasing telemetry
+      emit();
     }
   };
 
@@ -994,6 +1198,8 @@ export function subscribeAssignedJeepney(
   return () => {
     off(jeepneysRef, 'value', onJeepneysUpdate);
     if (unsubTelemetry) unsubTelemetry();
+    if (unsubRoute) unsubRoute();
+    if (unsubDevice) unsubDevice();
   };
 }
 

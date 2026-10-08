@@ -38,6 +38,8 @@ export interface FlowJeepResolvedDayWeather {
   description: string;
   iconType: WeatherIconCategory;
   locationName: string;
+  dailyHighC?: number;
+  dailyLowC?: number;
   date: string; // YYYY-MM-DD
   sourceType: WeatherSourceType;
   sourceLabel: string;
@@ -90,6 +92,8 @@ export async function resolveHybridDayWeather(
         description: histData.description,
         iconType: histData.iconType,
         locationName: cachedOpenWeather?.locationName || 'Historical Observation',
+        dailyHighC: histData.dailyHighC,
+        dailyLowC: histData.dailyLowC,
         date: isoDate,
         sourceType: 'historical',
         sourceLabel: 'Actual Observation (Historical)',
@@ -120,6 +124,8 @@ export async function resolveHybridDayWeather(
       description: owData.description,
       iconType: owData.iconType,
       locationName: owData.locationName,
+      dailyHighC: owData.dailyHighC,
+      dailyLowC: owData.dailyLowC,
       date: isoDate,
       sourceType: 'current',
       sourceLabel: 'Live Observed',
@@ -144,6 +150,8 @@ export async function resolveHybridDayWeather(
       description: matchedForecast.description,
       iconType: matchedForecast.iconType,
       locationName: owData.locationName,
+      dailyHighC: matchedForecast.tempMaxC,
+      dailyLowC: matchedForecast.tempMinC,
       date: isoDate,
       sourceType: 'forecast',
       sourceLabel: 'OpenWeather Forecast',
