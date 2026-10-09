@@ -15,8 +15,8 @@ interface DriverInterfaceProps {
 export type DriverTab = 'dashboard' | 'map' | 'forecast' | 'profile';
 
 export const DriverInterface: React.FC<DriverInterfaceProps> = ({ user, onLogout }) => {
-  // Map tab is the primary default tab matching the user's reference mockup
-  const [activeTab, setActiveTab] = useState<DriverTab>('map');
+  // Main Dashboard is the primary default tab
+  const [activeTab, setActiveTab] = useState<DriverTab>('dashboard');
   const [liveUser, setLiveUser] = useState<AuthUser | null>(user);
 
   // Synchronize with user prop when authentication changes
@@ -54,7 +54,11 @@ export const DriverInterface: React.FC<DriverInterfaceProps> = ({ user, onLogout
         )}
 
         {activeTab === 'dashboard' && (
-          <DriverDashboard user={liveUser} onLogout={onLogout} />
+          <DriverDashboard
+            user={liveUser}
+            onLogout={onLogout}
+            onNavigateProfile={() => setActiveTab('profile')}
+          />
         )}
 
         {activeTab === 'forecast' && (

@@ -26,7 +26,7 @@ export default function App() {
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
-          if (parsed && (parsed.role === 'commuter' || parsed.isGuest || parsed.role === 'driver' || parsed.role === 'admin')) {
+          if (parsed && (parsed.role === 'commuter' || parsed.isGuest || parsed.role === 'driver' || parsed.role === 'admin' || parsed.role === 'operator')) {
             return parsed;
           }
         } catch {
@@ -55,14 +55,14 @@ export default function App() {
     return () => unsub();
   }, [currentUser?.uid, currentUser?.email]);
 
-  // Preserve session if already stored in localStorage; otherwise start on onboarding
+  // Preserve session if already stored in localStorage; otherwise start on login ('auth')
   const [currentScreen, setCurrentScreen] = useState<AppScreen>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('flowjeep_user');
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
-          if (parsed && (parsed.role === 'commuter' || parsed.isGuest || parsed.role === 'driver' || parsed.role === 'admin')) {
+          if (parsed && (parsed.role === 'commuter' || parsed.isGuest || parsed.role === 'driver' || parsed.role === 'admin' || parsed.role === 'operator')) {
             return 'main';
           }
         } catch {
@@ -70,7 +70,7 @@ export default function App() {
         }
       }
     }
-    return 'onboarding';
+    return 'auth';
   });
 
   const handleOnboardingComplete = () => {
@@ -90,6 +90,9 @@ export default function App() {
   const handleLogout = async () => {
     await logoutUser();
     setCurrentUser(null);
+    try {
+      localStorage.removeItem('flowjeep_user');
+    } catch {}
     setCurrentScreen('auth');
   };
 
