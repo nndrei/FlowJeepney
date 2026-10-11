@@ -1,8 +1,7 @@
 # FlowJeep Camera Vision - Main Application Entry Point
 # File: main.py
-# Purpose: Real-time passenger counting prototype via Person Appearance & Disappearance.
-#          Uses ESP32-CAM stream (or webcam/video file), YOLOv8n, ByteTrack, missing-frames exit logic,
-#          and AUTOMATIC live telemetry sync to Firebase Realtime Database.
+# Purpose: Real-time passenger counting via YOLO person detection, ByteTrack,
+#          and virtual line crossing with Firebase Realtime Database telemetry sync.
 
 import sys
 import time
@@ -12,7 +11,6 @@ import requests
 import numpy as np
 from pathlib import Path
 
-# Local subsystem modules
 from config import (
     CAMERA_SOURCE,
     FRAME_WIDTH,
@@ -26,13 +24,13 @@ from config import (
     DEVICE,
     TRACKER_TYPE,
     TRAJECTORY_MAX_POINTS,
-    PERSON_MISSING_FRAMES,
-    CONFIRM_APPEARANCE_FRAMES,
-    REENTRY_COOLDOWN_FRAMES,
+    LINE_Y,
+    LINE_HYSTERESIS,
+    ENTRY_DIRECTION,
+    TRACK_MAX_MISSING_FRAMES,
     INITIAL_PASSENGER_COUNT,
     LOGS_DIR,
     CSV_LOG_FILENAME,
-    EXIT_TIMEOUT_SECONDS,
     MIN_PERSON_HEIGHT,
     MIN_PERSON_WIDTH,
     MIN_ASPECT_RATIO,
@@ -40,7 +38,6 @@ from config import (
     CAMERA_RECONNECT_DELAY,
     COLOR_BBOX,
     COLOR_BBOX_TEXT,
-    COLOR_TRAIL,
     COLOR_HUD_BG,
     COLOR_ENTRY,
     COLOR_EXIT,
@@ -58,7 +55,7 @@ from config import (
 )
 from camera import CameraStream
 from tracker import PassengerTracker
-from counter import AppearancePassengerCounter
+from counter import LineCrossingPassengerCounter
 from logger import EventLogger
 
 logging.basicConfig(
@@ -69,30 +66,37 @@ logging.basicConfig(
 logger = logging.getLogger("flowjeep.main")
 
 
+def draw_virtual_line(frame: np.ndarray, line_y: int, hysteresis: int) -> np.ndarray:
+    h, w, _ = frame.shape
+    overlay = frame.copy()
+    y_top = max(0, line_y - hysteresis)
+    y_bottom = min(h - 1, line_y + hysteresis)
+
+    # Deadzone band
+    cv2.rectangle(overlay, (0, y_top), (w, y_bottom), (60, 60, 60), -1)
+    cv2.addWeighted(overlay, 0.25, frame, 0.75, 0, frame)
+
+    # Main virtual crossing line
+    cv2.line(frame, (0, line_y), (w, line_y), (0, 215, 255), 2)
+    cv2.putText(frame, f"DOORWAY VIRTUAL LINE (Y={line_y})", (15, max(20, line_y - hysteresis - 8)),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 215, 255), 1, cv2.LINE_AA)
+    return frame
+
+
 def draw_hud_overlay(
     frame: np.ndarray,
-    counter: AppearancePassengerCounter,
+    counter: LineCrossingPassengerCounter,
     fps: float,
     status: str,
     recent_toast: str,
     toast_timer: float,
 ) -> np.ndarray:
-    """
-    Renders the FlowJeep engineering HUD:
-    FLOWJEEP CAMERA VISION
-    Entry: 5
-    Exit: 2
-    Current Passengers: 3
-    Active IDs: 3
-    FPS: 24.6
-    Status: RUNNING
-    """
     h, w, _ = frame.shape
     stats = counter.get_stats()
 
     overlay = frame.copy()
-    panel_w = 270
-    panel_h = 160
+    panel_w = 280
+    panel_h = 165
     cv2.rectangle(overlay, (12, 12), (panel_w, panel_h), COLOR_HUD_BG, -1)
     cv2.addWeighted(overlay, 0.88, frame, 0.12, 0, frame)
     cv2.rectangle(frame, (12, 12), (panel_w, panel_h), (50, 60, 70), 1)
@@ -106,11 +110,12 @@ def draw_hud_overlay(
     if stats['active_ids_list']:
         active_str += f" ({', '.join(map(str, stats['active_ids_list'][:4]))})"
     cv2.putText(frame, active_str, (22, 122), cv2.FONT_HERSHEY_SIMPLEX, 0.44, (200, 200, 200), 1, cv2.LINE_AA)
-    cv2.putText(frame, f"FPS: {fps:.1f} | Status: {status}", (22, 142), cv2.FONT_HERSHEY_SIMPLEX, 0.40, (160, 220, 255), 1, cv2.LINE_AA)
+    cv2.putText(frame, f"FPS: {fps:.1f} | Line Y: {counter.line_y}", (22, 142), cv2.FONT_HERSHEY_SIMPLEX, 0.40, (160, 220, 255), 1, cv2.LINE_AA)
+    cv2.putText(frame, f"Status: {status}", (22, 160), cv2.FONT_HERSHEY_SIMPLEX, 0.40, (180, 180, 180), 1, cv2.LINE_AA)
 
     cv2.putText(
         frame,
-        f"[Q] Quit | [R] Reset | [+/-] Missing Thresh ({counter.person_missing_frames} frames) | [S] Snap",
+        f"[Q] Quit | [R] Reset | [+/-] Line Y ({counter.line_y}) | [S] Snap",
         (14, h - 12),
         cv2.FONT_HERSHEY_SIMPLEX,
         0.38,
@@ -121,7 +126,7 @@ def draw_hud_overlay(
 
     if recent_toast and (time.time() - toast_timer < 2.5):
         toast_y = h - 35
-        toast_color = COLOR_ENTRY if ("ENTRY" in recent_toast or "CANCELLED" in recent_toast) else COLOR_EXIT
+        toast_color = COLOR_ENTRY if "ENTRY" in recent_toast else COLOR_EXIT
         cv2.rectangle(frame, (12, toast_y - 20), (w - 12, toast_y + 8), (15, 20, 25), -1)
         cv2.rectangle(frame, (12, toast_y - 20), (w - 12, toast_y + 8), toast_color, 1)
         cv2.putText(frame, recent_toast, (24, toast_y - 2), cv2.FONT_HERSHEY_DUPLEX, 0.50, (255, 255, 255), 1, cv2.LINE_AA)
@@ -130,13 +135,15 @@ def draw_hud_overlay(
 
 
 def draw_detected_people(frame: np.ndarray, tracks: list) -> np.ndarray:
-    """Renders bounding box and requested label: Person #<ID> \n <Confidence>"""
     for track in tracks:
         track_id = track["track_id"]
         conf = track["confidence"]
         x1, y1, x2, y2 = track["bbox"]
+        cx, cy = track["centroid"]
 
         cv2.rectangle(frame, (x1, y1), (x2, y2), COLOR_BBOX, 2)
+        cv2.circle(frame, (cx, cy), 4, (0, 255, 255), -1)
+
         label_line1 = f"Person #{track_id}"
         label_line2 = f"{conf:.2f}"
 
@@ -180,12 +187,12 @@ def main():
         min_aspect_ratio=MIN_ASPECT_RATIO,
         max_aspect_ratio=MAX_ASPECT_RATIO,
     )
-    counter = AppearancePassengerCounter(
-        person_missing_frames=PERSON_MISSING_FRAMES,
-        confirm_appearance_frames=CONFIRM_APPEARANCE_FRAMES,
-        reentry_cooldown_frames=REENTRY_COOLDOWN_FRAMES,
+    counter = LineCrossingPassengerCounter(
+        line_y=LINE_Y,
+        hysteresis=LINE_HYSTERESIS,
+        entry_direction=ENTRY_DIRECTION,
         initial_passenger_count=INITIAL_PASSENGER_COUNT,
-        exit_timeout_seconds=EXIT_TIMEOUT_SECONDS,
+        max_missing_frames=TRACK_MAX_MISSING_FRAMES,
     )
     event_logger = EventLogger(log_dir=LOGS_DIR, filename=CSV_LOG_FILENAME)
 
@@ -252,8 +259,7 @@ def main():
         except Exception as err:
             logger.debug(f"[Firebase Offline Sync Notice] {err}")
 
-    # Immediately push active heartbeat to Firebase upon camera launch
-    sync_firebase(0, is_heartbeat=True)
+    sync_firebase(counter.current_passenger_count, is_heartbeat=True)
     logger.info(f"[Firebase Initialized] ESP32-CAM active: {ESP32_CAM_IP} -> Unit {JEEPNEY_ID}")
 
     try:
@@ -267,7 +273,6 @@ def main():
                         mark_offline()
                         is_marked_offline = True
 
-                    # ESP32-CAM / webcam hiccup: keep the window alive while it reconnects
                     status = "WAITING FOR CAMERA"
                     placeholder = np.zeros((FRAME_HEIGHT, FRAME_WIDTH, 3), dtype=np.uint8)
                     cv2.putText(placeholder, "CONNECTING TO ESP32-CAM...", (60, FRAME_HEIGHT // 2 - 10),
@@ -276,6 +281,7 @@ def main():
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.44, (180, 180, 180), 1, cv2.LINE_AA)
                     cv2.putText(placeholder, "Make sure ESP32-CAM is powered and on 'Snow-WiFi'", (60, FRAME_HEIGHT // 2 + 55),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.40, (120, 120, 120), 1, cv2.LINE_AA)
+                    placeholder = draw_virtual_line(placeholder, counter.line_y, counter.hysteresis)
                     placeholder = draw_hud_overlay(placeholder, counter, fps, status, recent_toast, toast_timer)
                     cv2.imshow(window_name, placeholder)
                     if cv2.waitKey(100) & 0xFF == ord("q"):
@@ -288,7 +294,7 @@ def main():
                 disconnect_start_time = None
                 if is_marked_offline:
                     is_marked_offline = False
-                    sync_firebase(counter.get_stats()["current_passenger_count"], is_heartbeat=True)
+                    sync_firebase(counter.current_passenger_count, is_heartbeat=True)
                     logger.info(f"[Firebase Sync] ESP32-CAM reconnected -> Unit {JEEPNEY_ID} marked online")
 
             status = "RUNNING"
@@ -300,18 +306,15 @@ def main():
                 recent_toast = f"{event['event_type']} - ID {event['tracking_id']}"
                 toast_timer = time.time()
 
-            # --- FLOWJEEP REALTIME FIREBASE SYNC ---
             if events and ENABLE_FIREBASE_SYNC:
-                stats = counter.get_stats()
-                new_count = stats["current_passenger_count"]
+                new_count = counter.current_passenger_count
                 now_ms = int(time.time() * 1000)
 
-                # 1. Log doorway event to RTDB /doorway_events
                 for evt in events:
                     try:
                         event_payload = {
                             "jeepneyId": JEEPNEY_ID,
-                            "eventType": evt.get("event_type", "BOARDING"),
+                            "eventType": evt.get("event_type", "ENTRY"),
                             "trackingId": evt.get("tracking_id", -1),
                             "confidence": float(f"{evt.get('confidence', 0.0):.2f}"),
                             "currentOccupancy": new_count,
@@ -322,13 +325,10 @@ def main():
                     except Exception as evt_err:
                         logger.debug(f"[Firebase Event Log Error] {evt_err}")
 
-                # 2. Push updated passenger count
                 sync_firebase(new_count, is_heartbeat=False)
                 last_heartbeat = time.time()
             elif time.time() - last_heartbeat >= 5.0:
-                # Periodic 5-second online heartbeat
-                stats = counter.get_stats()
-                sync_firebase(stats["current_passenger_count"], is_heartbeat=True)
+                sync_firebase(counter.current_passenger_count, is_heartbeat=True)
                 last_heartbeat = time.time()
 
             now = time.time()
@@ -337,6 +337,7 @@ def main():
             if dt > 0:
                 fps = (fps * 0.9) + ((1.0 / dt) * 0.1)
 
+            frame = draw_virtual_line(frame, counter.line_y, counter.hysteresis)
             frame = draw_detected_people(frame, tracks)
             frame = draw_hud_overlay(frame, counter, fps, status, recent_toast, toast_timer)
 
@@ -350,20 +351,15 @@ def main():
                 tracker.reset()
                 recent_toast = "COUNTER RESET"
                 toast_timer = time.time()
-                if ENABLE_FIREBASE_SYNC:
-                    try:
-                        requests.patch(FIREBASE_DATABASE_URL, json={"occupiedSeats": 0}, timeout=1.5)
-                        logger.info("[Firebase Sync] Reset passenger count to 0")
-                    except Exception as e:
-                        logger.warning(f"[Firebase Sync Error] {e}")
-            elif key == ord("+"):
-                counter.person_missing_frames += 1
-            elif key == ord("-"):
-                counter.person_missing_frames = max(1, counter.person_missing_frames - 1)
+                sync_firebase(0, is_heartbeat=False)
+            elif key == ord("+") or key == ord("="):
+                counter.line_y = min(FRAME_HEIGHT - 10, counter.line_y + 10)
+            elif key == ord("-") or key == ord("_"):
+                counter.line_y = max(10, counter.line_y - 10)
             elif key == ord("s"):
                 snap_path = LOGS_DIR / f"snapshot_{int(time.time())}.png"
                 cv2.imwrite(str(snap_path), frame)
-                recent_toast = f"SNAPSHOT SAVED"
+                recent_toast = "SNAPSHOT SAVED"
                 toast_timer = time.time()
     finally:
         mark_offline()

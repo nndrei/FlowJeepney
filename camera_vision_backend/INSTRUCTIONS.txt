@@ -52,15 +52,15 @@ KEYBOARD SHORTCUTS IN THE CAMERA WINDOW:
 - [Q] : Quit the program
 - [R] : Reset passenger counter to 0 (and resets Firebase to 0)
 - [S] : Save a snapshot photo to the logs folder
-- [+] : Increase missing frame threshold
-- [-] : Decrease missing frame threshold
+- [+] : Move virtual line downward (+10 px)
+- [-] : Move virtual line upward (-10 px)
 
 --------------------------------------------------------------------------------
 FILES INCLUDED:
 --------------------------------------------------------------------------------
 - main.py                      : Main vision engine with automatic Firebase sync
-- config.py                    : Pre-configured camera IP and Firebase URL
-- counter.py                   : Person appearance & disappearance counter
+- config.py                    : Pre-configured camera, line crossing, and Firebase settings
+- counter.py                   : Virtual line crossing & state tracking passenger counter
 - tracker.py                   : YOLOv8 + ByteTrack person tracker
 - camera.py                    : High-speed threaded MJPEG stream receiver
 - logger.py                    : CSV event history logger

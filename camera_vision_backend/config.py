@@ -43,13 +43,17 @@ TRACKER_TYPE = "bytetrack.yaml"
 TRACK_BUFFER = 30
 TRAJECTORY_MAX_POINTS = 15
 
-# APPEARANCE & DISAPPEARANCE LOGIC (NO VIRTUAL LINES)
-# The ESP32-CAM streams ~10-20 fps and YOLO on CPU may process fewer, so these are in
-# PROCESSED frames. Raise PERSON_MISSING_FRAMES if people are counted as leaving too early.
-EXIT_TIMEOUT_SECONDS = 0.0      # extra seconds a person must be absent before EXIT (0 = off)
-PERSON_MISSING_FRAMES = 15
-CONFIRM_APPEARANCE_FRAMES = 2
-REENTRY_COOLDOWN_FRAMES = 30    # same ID back within this many frames after EXIT = tracker blip, EXIT is cancelled
+# VIRTUAL LINE-CROSSING CONFIGURATION
+# Default assumes camera looking down: doorway entrance is at the bottom of frame (BELOW),
+# inside cabin is towards the top (ABOVE).
+# ENTRY: Centroid moves from BELOW line to ABOVE line
+# EXIT: Centroid moves from ABOVE line to BELOW line
+LINE_Y = 240                     # Y-coordinate of the horizontal virtual line (0 to FRAME_HEIGHT)
+LINE_HYSTERESIS = 25             # Dead-zone band (pixels) +/- LINE_Y to prevent boundary jitter
+ENTRY_DIRECTION = "BELOW_TO_ABOVE"  # "BELOW_TO_ABOVE" or "ABOVE_TO_BELOW"
+
+# TRACKING PERSISTENCE
+TRACK_MAX_MISSING_FRAMES = 30    # Maximum frames to keep track alive after temporary occlusion
 
 INITIAL_PASSENGER_COUNT = 0
 MAX_JEEPNEY_CAPACITY = 22
