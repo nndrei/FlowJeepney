@@ -52,9 +52,10 @@ const JeepneyIcon: React.FC<{ className?: string }> = ({ className = 'w-7 h-7' }
 interface DriverDashboardProps {
   user: AuthUser | null;
   onLogout: () => void;
+  onNavigateProfile?: () => void;
 }
 
-export const DriverDashboard: React.FC<DriverDashboardProps> = ({ user }) => {
+export const DriverDashboard: React.FC<DriverDashboardProps> = ({ user, onNavigateProfile }) => {
   const [bundle, setBundle] = useState<DriverAssignedVehicleBundle>({
     jeepney: null,
     telemetry: null,
@@ -194,7 +195,8 @@ export const DriverDashboard: React.FC<DriverDashboardProps> = ({ user }) => {
                   {/* Chevron Button */}
                   <button
                     type="button"
-                    aria-label="View vehicle details"
+                    onClick={() => onNavigateProfile?.()}
+                    aria-label="View profile"
                     className="shrink-0 w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white/15 hover:bg-white/25 active:scale-95 transition-all text-white flex items-center justify-center cursor-pointer"
                   >
                     <ChevronRight className="w-3.5 h-3.5 text-white" />
@@ -248,12 +250,12 @@ export const DriverDashboard: React.FC<DriverDashboardProps> = ({ user }) => {
                   <h1 className="text-xs sm:text-sm font-bold tracking-tight text-white leading-tight">
                     No Jeepney Connected
                   </h1>
-                  {/* Chevron Button (Disabled) */}
+                  {/* Chevron Button */}
                   <button
                     type="button"
-                    disabled
-                    aria-label="No jeepney connected"
-                    className="shrink-0 w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white/10 text-white/50 flex items-center justify-center cursor-default"
+                    onClick={() => onNavigateProfile?.()}
+                    aria-label="View profile"
+                    className="shrink-0 w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 transition-all text-white flex items-center justify-center cursor-pointer"
                   >
                     <ChevronRight className="w-3.5 h-3.5" />
                   </button>
@@ -338,35 +340,50 @@ export const DriverDashboard: React.FC<DriverDashboardProps> = ({ user }) => {
             </div>
 
             {/* Stepper Labels */}
-            <div className="flex items-start justify-between mt-2.5 text-center">
+            <div className="flex items-start justify-between mt-2.5 gap-1.5">
               {/* Left: Previous Stop */}
-              <div className="text-left w-1/3">
-                <p className="text-xs text-slate-500 font-medium leading-tight truncate">
+              <div className="text-left flex-1 min-w-0 pr-1">
+                <p
+                  className="text-[11px] sm:text-xs text-slate-500 font-medium leading-snug break-words"
+                  title={stopsList[0]}
+                >
                   {stopsList[0]}
                 </p>
-                <span className="text-[11px] text-slate-400 font-medium">{pastStopIso}</span>
+                <span className="text-[10.5px] sm:text-[11px] text-slate-400 font-medium block mt-0.5">
+                  {pastStopIso}
+                </span>
               </div>
 
               {/* Center: Current Stop */}
-              <div className="w-1/3 text-center">
+              <div className="text-center flex-1 min-w-0 px-1">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block leading-tight">
                   Current Stop
                 </span>
-                <p className="text-xs font-black text-slate-900 leading-tight truncate">
+                <p
+                  className="text-[11px] sm:text-xs font-black text-slate-900 leading-snug break-words"
+                  title={stopsList[1]}
+                >
                   {stopsList[1]}
                 </p>
-                <span className="text-[11px] text-slate-400 font-medium">{currentStopIso}</span>
+                <span className="text-[10.5px] sm:text-[11px] text-slate-400 font-medium block mt-0.5">
+                  {currentStopIso}
+                </span>
               </div>
 
               {/* Right: Next Stop */}
-              <div className="text-right w-1/3">
+              <div className="text-right flex-1 min-w-0 pl-1">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block leading-tight">
                   Next Stop
                 </span>
-                <p className="text-xs text-slate-600 font-medium leading-tight truncate">
+                <p
+                  className="text-[11px] sm:text-xs text-slate-600 font-semibold leading-snug break-words"
+                  title={stopsList[2]}
+                >
                   {stopsList[2]}
                 </p>
-                <span className="text-[11px] text-slate-400 font-medium">{nextStopIso}</span>
+                <span className="text-[10.5px] sm:text-[11px] text-slate-400 font-medium block mt-0.5">
+                  {nextStopIso}
+                </span>
               </div>
             </div>
           </div>
@@ -480,7 +497,10 @@ export const DriverDashboard: React.FC<DriverDashboardProps> = ({ user }) => {
               </div>
 
               <div className="pt-1">
-                <p className="text-xs font-bold text-slate-900 leading-tight truncate">
+                <p
+                  className="text-xs font-bold text-slate-900 leading-snug break-words line-clamp-2"
+                  title={stopsList[stopsList.length - 1]}
+                >
                   {stopsList[stopsList.length - 1]}
                 </p>
                 <p className="text-xs text-slate-500 font-medium mt-0.5">

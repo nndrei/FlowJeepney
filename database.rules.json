@@ -21,8 +21,10 @@
       }
     },
     "devices": {
-      ".read": "auth != null",
-      ".write": "auth != null"
+      ".read": true,
+      "$device_id": {
+        ".write": true
+      }
     },
     "live_telemetry": {
       ".read": true,
